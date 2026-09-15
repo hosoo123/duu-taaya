@@ -1,16 +1,14 @@
 # Дуугаа Таа
 
-Монгол болон гадаад дууны богино preview-г сонсоод нэрийг нь таах веб тоглоом.
+Next.js, TypeScript, Tailwind CSS дээр хийсэн Монгол болон гадаад дуу таах тоглоом.
 
-## Боломжууд
+## Ажиллуулах
 
-- Монгол, гадаад дууны тусдаа сан
-- Hip-hop, поп, рок, зохиолын дууны ангилал
-- Easy, Medium, Hard, Expert түвшин
-- Random дараалал ба сая тоглосон дууг давтахгүй санах систем
-- Pause / resume болон илүү урт хэсэг сонсох
-- Desktop, mobile responsive UI
+```bash
+npm install
+npm run dev
+```
 
-Дууны preview болон мэдээллийг Apple Music каталогоос ачаална.
+Монгол/гадаад дууны тусдаа сан, genre ба difficulty шүүлтүүр, cryptographic random, pause/resume, Apple Music preview дэмжинэ.
 
 Live: https://duu-taaya.monhjargalhosbat.chatgpt.site
