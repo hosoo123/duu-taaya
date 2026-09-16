@@ -383,57 +383,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   50%{transform:translateX(7px)}
   75%{transform:translateX(-4px)}
 }
-.searchbox {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-.answer input {
-  width: 100%;
-  height: 54px;
-  border-radius: 16px;
-  border: 1px solid #32242c;
-  background: #0d0a11;
-  color: var(--ink);
-  padding: 0 18px;
-  outline: 0;
-  transition: .15s;
-}
-.answer input::placeholder { color: #5f565c; }
-.answer input:focus {
-  border-color: #6a3344;
-  box-shadow: 0 0 0 4px #ff2f5518;
-}
-.suggestions {
-  position: absolute;
-  z-index: 30;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 8px);
-  max-height: 240px;
-  overflow: auto;
-  padding: 6px;
-  border-radius: 16px;
-  border: 1px solid #3a2a34;
-  background: #141018f5;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 16px 40px #000a;
-}
-.suggestion {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border-radius: 12px;
-  padding: 10px 12px;
-  color: var(--ink);
-  transition: background .12s;
-}
-.suggestion:hover { background: #241820; }
-.suggestion b,
-.suggestion span { display: block; }
-.suggestion b { font-size: 14px; font-weight: 750; }
-.suggestion span { margin-top: 2px; color: var(--mute); font-size: 12px; }
-
+da
 .go {
   height: 54px;
   padding: 0 22px;
