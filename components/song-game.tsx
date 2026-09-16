@@ -77,11 +77,70 @@ const diffLabel:Record<Difficulty,string>={easy:"Easy",medium:"Med",hard:"Hard",
 const genreLabel=(g:Genre)=>g==="all"?"Бүгд":g==="new"?"Шинэ":g==="traditional"?"Зохиол":g==="anime"?"Anime OP":g==="jpop"?"J-pop":g==="nineties"?"90s":g==="twoThousands"?"2000s":g==="hiphop"?"Hip-Hop":g==="pop"?"Pop":"Rock";
 const releaseYear=(t:Track)=>{const d=t.releaseDate;if(!d)return null;const y=new Date(d).getFullYear();return Number.isFinite(y)?y:null};
 const eraOnly=new Set<Genre>(["nineties","twoThousands"]);
+type BoardEntry={id:string;name:string;score:number;streak:number;mode:string;difficulty:string;at:number};
+const LOCAL_BOARD_KEY="duuTaayaBoard";
+const NAME_KEY="duuTaayaName";
+const cleanName=(raw:string)=>raw.replace(/[^\p{L}\p{N} _.-]/gu,"").trim().slice(0,16);
+const readLocalBoard=():BoardEntry[]=>{try{const raw=JSON.parse(localStorage.getItem(LOCAL_BOARD_KEY)||"[]");return Array.isArray(raw)?raw:[]}catch{return[]}};
+const writeLocalBoard=(list:BoardEntry[])=>{try{localStorage.setItem(LOCAL_BOARD_KEY,JSON.stringify(list.slice(0,50)))}catch{}};
+const mergeBoards=(a:BoardEntry[],b:BoardEntry[])=>{
+  const map=new Map<string,BoardEntry>();
+  for(const e of [...a,...b]){
+    const k=e.name.toLowerCase();
+    const prev=map.get(k);
+    if(!prev||e.score>prev.score||(e.score===prev.score&&e.streak>prev.streak))map.set(k,e);
+  }
+  return [...map.values()].sort((x,y)=>y.score-x.score||y.streak-x.streak||x.at-y.at).slice(0,50);
+};
 export default function SongGame(){
- const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[revealInfo,setRevealInfo]=useState<(SkippedInfo&{artwork?:string;ok:boolean})|null>(null),[lastSkipped,setLastSkipped]=useState<SkippedInfo|null>(null),[volume,setVolume]=useState(.75),[sfxVolume,setSfxVolume]=useState(.7),[volPulse,setVolPulse]=useState(false),[sfxPulse,setSfxPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false),[fireworks,setFireworks]=useState<{id:number;x:number;y:number;hue:number;delay:number}[]>([]);
- const audio=useRef<HTMLAudioElement>(null),wave=useRef<HTMLDivElement>(null),searchbox=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),animation=useRef<number|null>(null),audioContext=useRef<AudioContext|null>(null),sfxContext=useRef<AudioContext|null>(null),analyser=useRef<AnalyserNode|null>(null),mediaSource=useRef<MediaElementAudioSourceNode|null>(null),remaining=useRef(0),started=useRef(0),paused=useRef(false),sfxVolRef=useRef(.7),limits=difficultyLimits[difficulty];
+ const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[revealInfo,setRevealInfo]=useState<(SkippedInfo&{artwork?:string;ok:boolean})|null>(null),[lastSkipped,setLastSkipped]=useState<SkippedInfo|null>(null),[volume,setVolume]=useState(.75),[sfxVolume,setSfxVolume]=useState(.7),[volPulse,setVolPulse]=useState(false),[sfxPulse,setSfxPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false),[fireworks,setFireworks]=useState<{id:number;x:number;y:number;hue:number;delay:number}[]>([]),[playerName,setPlayerName]=useState(""),[nameDraft,setNameDraft]=useState(""),[boardOpen,setBoardOpen]=useState(false),[nameOpen,setNameOpen]=useState(false),[board,setBoard]=useState<BoardEntry[]>([]),[boardPersistent,setBoardPersistent]=useState(false),[boardBusy,setBoardBusy]=useState(false),[submitNote,setSubmitNote]=useState("");
+ const audio=useRef<HTMLAudioElement>(null),wave=useRef<HTMLDivElement>(null),searchbox=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),animation=useRef<number|null>(null),audioContext=useRef<AudioContext|null>(null),sfxContext=useRef<AudioContext|null>(null),analyser=useRef<AnalyserNode|null>(null),mediaSource=useRef<MediaElementAudioSourceNode|null>(null),remaining=useRef(0),started=useRef(0),paused=useRef(false),sfxVolRef=useRef(.7),scoreRef=useRef(0),streakRef=useRef(0),nameRef=useRef(""),limits=difficultyLimits[difficulty];
+ useEffect(()=>{scoreRef.current=score},[score]);
+ useEffect(()=>{streakRef.current=streak},[streak]);
+ useEffect(()=>{nameRef.current=playerName},[playerName]);
  useEffect(()=>{try{const saved=localStorage.getItem("duuTaayaSfxVol");if(saved!=null){const v=Math.min(1,Math.max(0,Number(saved)));setSfxVolume(v);sfxVolRef.current=v}}catch{}},[]);
+ useEffect(()=>{try{const n=cleanName(localStorage.getItem(NAME_KEY)||"");if(n){setPlayerName(n);setNameDraft(n)}else setNameOpen(true);setBoard(readLocalBoard())}catch{setNameOpen(true)}},[]);
  useEffect(()=>{sfxVolRef.current=sfxVolume;try{localStorage.setItem("duuTaayaSfxVol",String(sfxVolume))}catch{}},[sfxVolume]);
+ const saveName=(raw:string)=>{const n=cleanName(raw);if(n.length<2)return false;setPlayerName(n);setNameDraft(n);nameRef.current=n;try{localStorage.setItem(NAME_KEY,n)}catch{}setNameOpen(false);return true};
+ const refreshBoard=useCallback(async()=>{
+  setBoardBusy(true);
+  try{
+    const local=readLocalBoard();
+    const res=await fetch("/api/leaderboard",{cache:"no-store"});
+    if(res.ok){
+      const data=await res.json();
+      const remote=Array.isArray(data.scores)?data.scores as BoardEntry[]:[];
+      const merged=mergeBoards(local,remote);
+      writeLocalBoard(merged);
+      setBoard(merged);
+      setBoardPersistent(Boolean(data.persistent));
+    }else setBoard(local);
+  }catch{setBoard(readLocalBoard())}
+  finally{setBoardBusy(false)}
+ },[]);
+ const submitScore=useCallback(async(force=false)=>{
+  const name=nameRef.current||playerName;
+  const points=scoreRef.current;
+  const st=streakRef.current;
+  if(!name||points<1){if(force){setNameOpen(true);setSubmitNote("Эхлээд нэрээ оруул")}return}
+  const localEntry:BoardEntry={id:`local-${norm(name)}`,name,score:points,streak:st,mode,difficulty,at:Date.now()};
+  const mergedLocal=mergeBoards(readLocalBoard(),[localEntry]);
+  writeLocalBoard(mergedLocal);
+  setBoard(mergedLocal);
+  try{
+    const res=await fetch("/api/leaderboard",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,score:points,streak:st,mode,difficulty})});
+    if(res.ok){
+      const data=await res.json();
+      const remote=Array.isArray(data.scores)?data.scores as BoardEntry[]:[];
+      const merged=mergeBoards(mergedLocal,remote);
+      writeLocalBoard(merged);
+      setBoard(merged);
+      setBoardPersistent(Boolean(data.persistent));
+      setSubmitNote(data.updated?"Leaderboard-д хадгаллаа":"Өмнөх онооноос бага байна");
+    }else setSubmitNote("Локал хадгаллаа");
+  }catch{setSubmitNote("Локал хадгаллаа")}
+ },[playerName,mode,difficulty]);
+ const openBoard=()=>{setBoardOpen(true);setSubmitNote("");void refreshBoard()};
  const playSfx=useCallback(async(kind:"good"|"bad")=>{try{
   const AC=window.AudioContext||(window as typeof window&{webkitAudioContext:typeof AudioContext}).webkitAudioContext;
   if(!sfxContext.current)sfxContext.current=new AC();
@@ -188,7 +247,7 @@ export default function SongGame(){
  },[]);
  useEffect(()=>{if(!current)return;void resolveListenLinksCached(current)},[current,resolveListenLinksCached]);
  const snapshot=(t:Track,ok:boolean,links?:{spotify:string;youtube:string})=>{const anime=animeOf(t),romaji=romajiOf(t);const cached=listenCache.current.get(String(t.trackId));return{trackName:t.trackName,artistName:t.artistName,romaji,anime,spotify:links?.spotify||cached?.spotify||spotifySearchUrl(t),youtube:links?.youtube||cached?.youtube||youtubeSearchUrl(t),artwork:t.artworkUrl100,ok}};
- const reveal=(ok:boolean)=>{if(!current)return;finish();void playSfx(ok?"good":"bad");if(ok)burstFireworks();const track=current;const info=snapshot(track,ok);setRevealInfo(info);if(!ok)setLastSkipped(info);setRevealed(true);setSuggestionsOpen(false);setMessage("");setKind(ok?"good":"bad");void resolveListenLinksCached(track).then(links=>{const next=snapshot(track,ok,links);setRevealInfo(prev=>prev&&prev.trackName===track.trackName&&prev.artistName===track.artistName?next:prev);if(!ok)setLastSkipped(prev=>prev&&prev.trackName===track.trackName&&prev.artistName===track.artistName?{trackName:next.trackName,artistName:next.artistName,romaji:next.romaji,anime:next.anime,spotify:next.spotify,youtube:next.youtube}:prev)});setTimeout(()=>{setRound(r=>r>=10?1:r+1);if(!takeNext(tracks))load()},3800)};
+ const reveal=(ok:boolean)=>{if(!current)return;finish();void playSfx(ok?"good":"bad");if(ok)burstFireworks();const track=current;const info=snapshot(track,ok);setRevealInfo(info);if(!ok)setLastSkipped(info);setRevealed(true);setSuggestionsOpen(false);setMessage("");setKind(ok?"good":"bad");void resolveListenLinksCached(track).then(links=>{const next=snapshot(track,ok,links);setRevealInfo(prev=>prev&&prev.trackName===track.trackName&&prev.artistName===track.artistName?next:prev);if(!ok)setLastSkipped(prev=>prev&&prev.trackName===track.trackName&&prev.artistName===track.artistName?{trackName:next.trackName,artistName:next.artistName,romaji:next.romaji,anime:next.anime,spotify:next.spotify,youtube:next.youtube}:prev)});const endOfSet=round>=10;setTimeout(()=>{if(endOfSet){void submitScore(false);setBoardOpen(true)}setRound(r=>r>=10?1:r+1);if(!takeNext(tracks))load()},3800)};
  const submit=()=>{if(!current||revealed)return;const q=norm(guess);if(q.length<2){void playSfx("bad");setMessage("Нэрээ бич");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450);return}const picked=selected==null?null:[current,...tracks].find(t=>t.trackId===selected)??null;const ok=guessCorrect(guess,current,picked,selected);if(ok){setScore(s=>s+Math.max(20,100-level*20));setStreak(s=>s+1);reveal(true)}else{void playSfx("bad");setStreak(0);setMessage("Буруу");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450)}};
  const volTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const bumpVolRef=useRef<(d:number)=>void>(()=>{});
@@ -230,6 +289,8 @@ export default function SongGame(){
       <button key={d} className={`diff ${difficulty===d?"active":""}`} onClick={()=>{setDifficulty(d);setLevel(0)}}>{diffLabel[d]}</button>
      ))}</div>
     </div>
+    <button className="board-btn" type="button" onClick={openBoard} title="Leaderboard">🏆</button>
+    <button className="name-chip" type="button" onClick={()=>{setNameDraft(playerName);setNameOpen(true)}} title="Нэр солих">{playerName||"Нэр?"}</button>
     <button className="reset" onClick={()=>{setScore(0);setStreak(0);setRound(1);load()}} title="Шинээр">↻</button>
     <div className="vol-rail">
      {volCtrl(true,"music")}
@@ -244,6 +305,7 @@ export default function SongGame(){
       <button className={`pill ${mode==="foreign"?"on":""}`} onClick={()=>{setMode("foreign");setGenre("all");setScore(0);setStreak(0);setRound(1)}}>Гадаад</button>
      </div>
      <div className="stats"><b>{score}</b><span>оноо</span><i/><b>{streak}</b><span>streak</span><i/><b>{round}/10</b></div>
+     <button className="board-btn mobile" type="button" onClick={openBoard} aria-label="Leaderboard">🏆</button>
     </header>
 
     <div className="vol-mobile">
@@ -339,6 +401,58 @@ export default function SongGame(){
         </a>
        </div>
        <em>Бүтнээр нь сонсох бол дээр дар</em>
+      </div>
+     </div>
+    )}
+
+    {nameOpen&&(
+     <div className="board-overlay" role="dialog" aria-modal="true">
+      <div className="board-card name-card">
+       <small>ТОГЛОГЧИЙН НЭР</small>
+       <strong>Leaderboard-д гарах нэр</strong>
+       <input
+        value={nameDraft}
+        maxLength={16}
+        autoFocus
+        placeholder="Жнь: Hoso"
+        onChange={e=>setNameDraft(e.target.value)}
+        onKeyDown={e=>{if(e.key==="Enter")saveName(nameDraft)}}
+       />
+       <div className="board-actions">
+        {playerName&&<button type="button" className="ghost" onClick={()=>setNameOpen(false)}>Болих</button>}
+        <button type="button" className="go" onClick={()=>saveName(nameDraft)}>Хадгалах</button>
+       </div>
+      </div>
+     </div>
+    )}
+
+    {boardOpen&&(
+     <div className="board-overlay" role="dialog" aria-modal="true" onClick={e=>{if(e.target===e.currentTarget)setBoardOpen(false)}}>
+      <div className="board-card">
+       <div className="board-head">
+        <div>
+         <small>LEADERBOARD</small>
+         <strong>Top тоглогчид</strong>
+        </div>
+        <button type="button" className="board-close" onClick={()=>setBoardOpen(false)} aria-label="Хаах">×</button>
+       </div>
+       <p className="board-meta">{playerName?`Та: ${playerName} · ${score} оноо`:"Нэрээ оруулна уу"} · {boardPersistent?"PostgreSQL":"offline"}</p>
+       <div className="board-list">
+        {boardBusy&&board.length===0&&<p className="board-empty">Ачаалж байна…</p>}
+        {!boardBusy&&board.length===0&&<p className="board-empty">Одоогоор хоосон. 10 дуу таагаад оноогоо илгээгээрэй.</p>}
+        {board.map((e,i)=>(
+         <div key={e.id||`${e.name}-${i}`} className={`board-row ${playerName&&e.name.toLowerCase()===playerName.toLowerCase()?"me":""}`}>
+          <span className="board-rank">{i+1}</span>
+          <span className="board-name">{e.name}</span>
+          <span className="board-score">{e.score}</span>
+         </div>
+        ))}
+       </div>
+       {submitNote&&<p className="board-note">{submitNote}</p>}
+       <div className="board-actions">
+        <button type="button" className="ghost" onClick={()=>void refreshBoard()} disabled={boardBusy}>Шинэчлэх</button>
+        <button type="button" className="go" onClick={()=>void submitScore(true)} disabled={score<1}>Оноо илгээх</button>
+       </div>
       </div>
      </div>
     )}
