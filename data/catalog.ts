@@ -1,10 +1,10 @@
-export type Genre = "all" | "new" | "hiphop" | "pop" | "rock" | "traditional" | "anime";
+export type Genre = "all" | "new" | "hiphop" | "pop" | "rock" | "traditional" | "anime" | "animeAlt";
 export type Mode = "mongolian" | "foreign";
 export type Difficulty = "easy" | "medium" | "hard" | "expert";
 export const mongolianPools = {hiphop:[1367677814,597516857,1487894632,1435610205,1521797981,590987595,1484781480,1539720781,1548048781,1506138145,1485279340,1687212149,1455621805,1214134207,1360769817,1489742710,1761861989,1692564364,1492878825,1296470407,1470784928,980561682,1525350814,1722702882,1510709380,1553254065,1171518549,1503275814,527811499],pop:[1409906507,942710240,1152715395,1039734760,1129552659,994149517,1206337108,1547526091,1588440238,1556818514,1593889306,1331038337,1051840980,1106749316,1493175994,1478794050,1688219483],rock:[391885107,1575741669,447469926,1400709292,525225197,469059052,530429916],traditional:[899354032,1528489404,1497290436,928900913]};
 export const mongolianFeatured = {hiphop:[1804619903,1823104057,1804619919,1840138677,1735903659,1834973787,6809582687,6762779404,1802703160,6802760867,6762458695,1870863884,1489743129,1823661248],pop:[6799350078,6789638270,1774565007,1612059285,1556290553,1735321565,1713025991,6781416005],rock:[1566590086,537495993],traditional:[1206372828,1497291964]};
-export const foreignPools = {hiphop:[271256,111051,368183298,549236696,1082533559,966309175,830588310,894820464,2715720,1437641643,1790556764,1476945235,605391263],pop:[159260351,479756766,1065981054,278873078,412778295,183313439,1031397873,63346553,320569549,277293880,605800394,260414340,1798556,390647681,1264818718,979458609,1589842503,261686],rock:[471744,148662,358714030,62820413,112018],anime:[573943518,576328297,73407309,633973271,550412714,551926304,1124210967,1080967231,1258439196,1490256993,530814268,678140651,962221033,260700751,252604926,674472463,328815944,1289607378,624956375,546978158,950119131,295201343,417196059,260690938,1492604670,91160335,569938402,356343216]};
-export const foreignFeatured = {hiphop:[],pop:[],rock:[],anime:[1529543135,1538098094,1537785962,1500836562,1538157315,1536256935,666788983,1606345338,1543126646,1702823583,1688334537,1648272180,1531847485,1720332181,1771603031,1538275660,1480313619,1770907052,1537445612,1521453384,1229977150,1601391184,1692289314,1538160322,1119496702,1538131041,1536394884,1536382006,1538286096,1436825394,1410776543,1552682825,1636446946,1523038689]};
+export const foreignPools = {hiphop:[271256,111051,368183298,549236696,1082533559,966309175,830588310,894820464,2715720,1437641643,1790556764,1476945235,605391263],pop:[159260351,479756766,1065981054,278873078,412778295,183313439,1031397873,63346553,320569549,277293880,605800394,260414340,1798556,390647681,1264818718,979458609,1589842503,261686],rock:[471744,148662,358714030,62820413,112018],anime:[573943518,576328297,73407309,633973271,550412714,551926304,1124210967,1080967231,1258439196,1490256993,530814268,678140651,962221033,260700751,252604926,674472463,328815944,1289607378,624956375,546978158,950119131,295201343,417196059,260690938,1492604670,91160335,569938402,356343216],animeAlt:[]};
+export const foreignFeatured = {hiphop:[],pop:[],rock:[],anime:[1529543135,1538098094,1537785962,1500836562,1538157315,1536256935,666788983,1606345338,1543126646,1702823583,1688334537,1648272180,1531847485,1720332181,1771603031,1538275660,1480313619,1770907052,1537445612,1521453384,1229977150,1601391184,1692289314,1538160322,1119496702,1538131041,1536394884,1536382006,1538286096,1436825394,1410776543,1552682825,1636446946,1523038689],animeAlt:[1540793097,1711648292,1451232176,1477944584,1721842999,209265812,1500836583,1538910934,1045879578,1521442611,423766416,1521453384,1540549629,1239706773,1537215962,1743348037,1843786357]};
 export const animeSources:Record<number,string>={
  1529543135:"Demon Slayer: Kimetsu no Yaiba",
  1538098094:"Tokyo Ghoul",
@@ -40,6 +40,22 @@ export const animeSources:Record<number,string>={
  1552682825:"Attack on Titan: The Final Season",
  1636446946:"One Piece Film Red",
  1523038689:"Your Name",
+ 1540793097:"Cyberpunk: Edgerunners",
+ 1711648292:"Cyberpunk: Edgerunners",
+ 1451232176:"Initial D",
+ 1477944584:"Initial D",
+ 1721842999:"Samurai Champloo",
+ 209265812:"Samurai Champloo",
+ 1500836583:"Neon Genesis Evangelion",
+ 1538910934:"Jujutsu Kaisen",
+ 1045879578:"Parasyte: The Maxim",
+ 1521442611:"Cowboy Bebop",
+ 423766416:"Ghost in the Shell: Stand Alone Complex",
+ 1540549629:"Neon Genesis Evangelion",
+ 1239706773:"Attack on Titan",
+ 1537215962:"City Hunter",
+ 1743348037:"One-Punch Man",
+ 1843786357:"Steins;Gate",
 };
 export const animeSourcesByTitle:Record<string,string>={
  gurenge:"Demon Slayer: Kimetsu no Yaiba",
@@ -77,6 +93,22 @@ export const animeSourcesByTitle:Record<string,string>={
  bokunosensou:"Attack on Titan: The Final Season",
  newgenesis:"One Piece Film Red",
  sparkle:"Your Name",
+ ireallywanttostayatyourhouse:"Cyberpunk: Edgerunners",
+ letyoudown:"Cyberpunk: Edgerunners",
+ runninginthe90s:"Initial D",
+ dejavu:"Initial D",
+ battlecry:"Samurai Champloo",
+ shikinoouta:"Samurai Champloo",
+ flymetothemoonyokotakahashiacidbossaversion:"Neon Genesis Evangelion",
+ lostinparadise:"Jujutsu Kaisen",
+ letmehear:"Parasyte: The Maxim",
+ therealfolkblues:"Cowboy Bebop",
+ inneruniverse:"Ghost in the Shell: Stand Alone Complex",
+ kommsussertodmedirectorseditversion:"Neon Genesis Evangelion",
+ barricades:"Attack on Titan",
+ getwild:"City Hunter",
+ theheroikarerukobushinihiwotsukero:"One-Punch Man",
+ hackingtothegate:"Steins;Gate",
 };
 /** Canonical title (norm, no spaces) → accepted romaji / alternate spellings */
 export const animeRomajiByCanon:Record<string,string[]>={
@@ -115,6 +147,22 @@ export const animeRomajiByCanon:Record<string,string[]>={
  bokunosensou:["bokunosensou","boku no sensou","mywar"],
  newgenesis:["newgenesis","new genesis","uta"],
  sparkle:["sparkle","sparkle movie ver"],
+ ireallywanttostayatyourhouse:["ireallywanttostayatyourhouse","stayatyourhouse"],
+ letyoudown:["letyoudown","let you down"],
+ runninginthe90s:["runninginthe90s","running in the 90s"],
+ dejavu:["dejavu","deja vu"],
+ battlecry:["battlecry","battle cry"],
+ shikinoouta:["shikinoouta","shiki no uta"],
+ flymetothemoonyokotakahashiacidbossaversion:["flymetothemoon","fly me to the moon"],
+ lostinparadise:["lostinparadise","lost in paradise"],
+ letmehear:["letmehear","let me hear"],
+ therealfolkblues:["therealfolkblues","the real folk blues"],
+ inneruniverse:["inneruniverse","inner universe"],
+ kommsussertodmedirectorseditversion:["kommsussertod","komm susser tod"],
+ barricades:["barricades"],
+ getwild:["getwild","get wild"],
+ theheroikarerukobushinihiwotsukero:["thehero","the hero"],
+ hackingtothegate:["hackingtothegate","hacking to the gate"],
 };
 /** Canonical title → primary romaji label for reveal UI */
 export const animeRomajiDisplay:Record<string,string>={
@@ -153,7 +201,23 @@ export const animeRomajiDisplay:Record<string,string>={
  bokunosensou:"Boku no Sensou",
  newgenesis:"New Genesis",
  sparkle:"Sparkle",
+ ireallywanttostayatyourhouse:"I Really Want to Stay at Your House",
+ letyoudown:"Let You Down",
+ runninginthe90s:"Running in the 90's",
+ dejavu:"DEJA VU",
+ battlecry:"Battlecry",
+ shikinoouta:"Shiki no Uta",
+ flymetothemoonyokotakahashiacidbossaversion:"Fly Me to the Moon",
+ lostinparadise:"LOST IN PARADISE",
+ letmehear:"Let Me Hear",
+ therealfolkblues:"The Real Folk Blues",
+ inneruniverse:"Inner Universe",
+ kommsussertodmedirectorseditversion:"Komm, süsser Tod",
+ barricades:"Barricades",
+ getwild:"Get Wild",
+ theheroikarerukobushinihiwotsukero:"THE HERO !!",
+ hackingtothegate:"Hacking to the Gate",
 };
 export const cuePoints:Record<number,number>={6809582687:2,6762779404:2,1802703160:2,6802760867:2,6762458695:2,1870863884:3,1489743129:3,1823661248:3,1556290553:3,1735321565:3,1713025991:3,6781416005:3,1497291964:4,1206372828:3,1566590086:3,1612059285:3};
-export const labels:Record<Genre,string>={all:"БҮГД",new:"ШИНЭ ДУУ",hiphop:"HIP-HOP",pop:"ПОП",rock:"РОК",traditional:"ЗОХИОЛЫН ДУУ",anime:"ANIME OP"};
+export const labels:Record<Genre,string>={all:"БҮГД",new:"ШИНЭ ДУУ",hiphop:"HIP-HOP",pop:"ПОП",rock:"РОК",traditional:"ЗОХИОЛЫН ДУУ",anime:"J-POP OP",animeAlt:"ANIME ≠ J-POP"};
 export const difficultyLimits:Record<Difficulty,number[]>={easy:[2,5,8,15,25],medium:[.5,2,5,10,15],hard:[.2,.5,2,5,10],expert:[.1,.3,1,3,8]};

@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {animeRomajiByCanon,animeRomajiDisplay,animeSources,animeSourcesByTitle,cuePoints,difficultyLimits,foreignFeatured,foreignPools,mongolianFeatured,mongolianPools,type Difficulty,type Genre,type Mode} from "@/data/catalog";
 type Track={trackId:number;artistId:number;trackName:string;artistName:string;previewUrl:string;artworkUrl100?:string;releaseDate?:string;collectionName?:string;wrapperType:string};
-const genres:Genre[]=["all","new","hiphop","pop","rock","traditional","anime"];
+const genres:Genre[]=["all","new","hiphop","pop","rock","traditional","anime","animeAlt"];
 const instrumental=/\b(instrumental|karaoke|backing track|minus one|no vocals?|vocal off|off vocal|beat only)\b|зөвхөн ая|ая хувилбар/i;
 const edition=/\b(remaster(?:ed)?|live|remix|acoustic|instrumental|karaoke|radio edit|sped up|slowed|version|edit)\b/i;
 const norm=(s:string)=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zа-яөүё0-9]/gi,"");
@@ -43,12 +43,20 @@ const animeAliases:Record<string,string[]>={
  codegeass:["codegeass","geass"],
  haikyuu:["haikyuu","haikyu"],
  yourname:["yourname","kiminonawa"],
+ cyberpunkedgerunners:["cyberpunk","edgerunners"],
+ initiald:["initiald","initial d","eurobeat"],
+ samuraichamploo:["champloo","samurai"],
+ parasytethemaxim:["parasyte"],
+ ghostintheshellstandalonecomplex:["ghostintheshell","gits"],
+ cityhunter:["cityhunter"],
+ onepunchman:["onepunchman","opm"],
+ steinsgate:["steinsgate","steins gate"],
 };
 const animeHit=(t:Track,q:string)=>{const a=animeOf(t);if(!a||q.length<2)return false;const na=norm(a);if(na.includes(q))return true;const aliases=animeAliases[na]||[];return aliases.some(x=>x.includes(q)||q.includes(x))};
 const shuffle=<T,>(x:T[])=>{const a=[...x];for(let i=a.length-1;i>0;i--){const n=new Uint32Array(1);crypto.getRandomValues(n);const j=n[0]%(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
-const visibleGenres=(mode:Mode)=>genres.filter(g=>mode==="mongolian"?g!=="anime":g!=="traditional");
+const visibleGenres=(mode:Mode)=>genres.filter(g=>mode==="mongolian"?g!=="anime"&&g!=="animeAlt":g!=="traditional");
 const diffLabel:Record<Difficulty,string>={easy:"Easy",medium:"Med",hard:"Hard",expert:"Pro"};
-const genreLabel=(g:Genre)=>g==="all"?"Бүгд":g==="new"?"Шинэ":g==="traditional"?"Зохиол":g==="anime"?"Anime":g==="hiphop"?"Hip-Hop":g==="pop"?"Pop":"Rock";
+const genreLabel=(g:Genre)=>g==="all"?"Бүгд":g==="new"?"Шинэ":g==="traditional"?"Зохиол":g==="anime"?"J-pop OP":g==="animeAlt"?"J-pop биш":g==="hiphop"?"Hip-Hop":g==="pop"?"Pop":"Rock";
 export default function SongGame(){
  const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[volume,setVolume]=useState(.75),[volPulse,setVolPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false);
  const audio=useRef<HTMLAudioElement>(null),wave=useRef<HTMLDivElement>(null),searchbox=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),animation=useRef<number|null>(null),audioContext=useRef<AudioContext|null>(null),analyser=useRef<AnalyserNode|null>(null),mediaSource=useRef<MediaElementAudioSourceNode|null>(null),remaining=useRef(0),started=useRef(0),paused=useRef(false),limits=difficultyLimits[difficulty];
