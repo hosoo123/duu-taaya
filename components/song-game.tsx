@@ -62,73 +62,94 @@ const visibleGenres=(mode:Mode)=>genres.filter(g=>mode==="mongolian"?g!=="anime"
 const diffLabel:Record<Difficulty,string>={easy:"Easy",medium:"Med",hard:"Hard",expert:"Pro"};
 const genreLabel=(g:Genre)=>g==="all"?"Бүгд":g==="new"?"Шинэ":g==="traditional"?"Зохиол":g==="anime"?"Anime OP":g==="jpop"?"J-pop":g==="hiphop"?"Hip-Hop":g==="pop"?"Pop":"Rock";
 export default function SongGame(){
- const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[revealInfo,setRevealInfo]=useState<(SkippedInfo&{artwork?:string;ok:boolean})|null>(null),[lastSkipped,setLastSkipped]=useState<SkippedInfo|null>(null),[volume,setVolume]=useState(.75),[volPulse,setVolPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false);
- const audio=useRef<HTMLAudioElement>(null),wave=useRef<HTMLDivElement>(null),searchbox=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),animation=useRef<number|null>(null),audioContext=useRef<AudioContext|null>(null),sfxContext=useRef<AudioContext|null>(null),analyser=useRef<AnalyserNode|null>(null),mediaSource=useRef<MediaElementAudioSourceNode|null>(null),remaining=useRef(0),started=useRef(0),paused=useRef(false),limits=difficultyLimits[difficulty];
+ const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[revealInfo,setRevealInfo]=useState<(SkippedInfo&{artwork?:string;ok:boolean})|null>(null),[lastSkipped,setLastSkipped]=useState<SkippedInfo|null>(null),[volume,setVolume]=useState(.75),[sfxVolume,setSfxVolume]=useState(.7),[volPulse,setVolPulse]=useState(false),[sfxPulse,setSfxPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false),[fireworks,setFireworks]=useState<{id:number;x:number;y:number;hue:number;delay:number}[]>([]);
+ const audio=useRef<HTMLAudioElement>(null),wave=useRef<HTMLDivElement>(null),searchbox=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),animation=useRef<number|null>(null),audioContext=useRef<AudioContext|null>(null),sfxContext=useRef<AudioContext|null>(null),analyser=useRef<AnalyserNode|null>(null),mediaSource=useRef<MediaElementAudioSourceNode|null>(null),remaining=useRef(0),started=useRef(0),paused=useRef(false),sfxVolRef=useRef(.7),limits=difficultyLimits[difficulty];
+ useEffect(()=>{try{const saved=localStorage.getItem("duuTaayaSfxVol");if(saved!=null){const v=Math.min(1,Math.max(0,Number(saved)));setSfxVolume(v);sfxVolRef.current=v}}catch{}},[]);
+ useEffect(()=>{sfxVolRef.current=sfxVolume;try{localStorage.setItem("duuTaayaSfxVol",String(sfxVolume))}catch{}},[sfxVolume]);
  const playSfx=useCallback(async(kind:"good"|"bad")=>{try{
   const AC=window.AudioContext||(window as typeof window&{webkitAudioContext:typeof AudioContext}).webkitAudioContext;
   if(!sfxContext.current)sfxContext.current=new AC();
   const ctx=sfxContext.current;
   if(ctx.state==="suspended")await ctx.resume();
   const t0=ctx.currentTime;
+  const level=Math.max(.02,sfxVolRef.current);
   const master=ctx.createGain();
-  master.gain.value=.85;
+  master.gain.value=level;
   const filter=ctx.createBiquadFilter();
   filter.type="lowpass";
-  filter.Q.value=.7;
-  const delay=ctx.createDelay(0.5);
-  delay.delayTime.value=.12;
+  filter.Q.value=.85;
+  const delay=ctx.createDelay(0.6);
+  delay.delayTime.value=.14;
   const feedback=ctx.createGain();
-  feedback.gain.value=.22;
+  feedback.gain.value=.26;
   const wet=ctx.createGain();
-  wet.gain.value=.28;
+  wet.gain.value=.32;
   const dry=ctx.createGain();
-  dry.gain.value=.72;
+  dry.gain.value=.7;
   filter.connect(dry);dry.connect(master);
   filter.connect(delay);delay.connect(wet);wet.connect(master);
   delay.connect(feedback);feedback.connect(delay);
   master.connect(ctx.destination);
   const note=(freq:number,at:number,dur:number,vol:number,type:OscillatorType="sine",slideTo?:number)=>{
-   const o=ctx.createOscillator(),g=ctx.createGain(),p=ctx.createGain();
+   const o=ctx.createOscillator(),g=ctx.createGain();
    o.type=type;
    o.frequency.setValueAtTime(freq,t0+at);
-   if(slideTo)o.frequency.exponentialRampToValueAtTime(slideTo,t0+at+dur*.85);
+   if(slideTo)o.frequency.exponentialRampToValueAtTime(Math.max(40,slideTo),t0+at+dur*.85);
    g.gain.setValueAtTime(.0001,t0+at);
-   g.gain.exponentialRampToValueAtTime(vol,t0+at+.04);
-   g.gain.setValueAtTime(vol*.92,t0+at+dur*.35);
+   g.gain.exponentialRampToValueAtTime(vol,t0+at+.035);
+   g.gain.setValueAtTime(vol*.9,t0+at+dur*.4);
    g.gain.exponentialRampToValueAtTime(.0001,t0+at+dur);
-   p.gain.value=.55;
-   o.connect(g);g.connect(p);p.connect(filter);
-   // soft harmonic shimmer
+   o.connect(g);g.connect(filter);
    const h=ctx.createOscillator(),hg=ctx.createGain();
    h.type="triangle";
-   h.frequency.setValueAtTime(freq*2,t0+at);
-   if(slideTo)h.frequency.exponentialRampToValueAtTime(slideTo*2,t0+at+dur*.85);
+   h.frequency.setValueAtTime(freq*2.01,t0+at);
+   if(slideTo)h.frequency.exponentialRampToValueAtTime(Math.max(80,slideTo*2),t0+at+dur*.85);
    hg.gain.setValueAtTime(.0001,t0+at);
-   hg.gain.exponentialRampToValueAtTime(vol*.18,t0+at+.05);
-   hg.gain.exponentialRampToValueAtTime(.0001,t0+at+dur*.9);
+   hg.gain.exponentialRampToValueAtTime(vol*.22,t0+at+.045);
+   hg.gain.exponentialRampToValueAtTime(.0001,t0+at+dur*.88);
    h.connect(hg);hg.connect(filter);
-   o.start(t0+at);o.stop(t0+at+dur+.05);
-   h.start(t0+at);h.stop(t0+at+dur+.05);
+   o.start(t0+at);o.stop(t0+at+dur+.04);
+   h.start(t0+at);h.stop(t0+at+dur+.04);
+  };
+  const crackle=(at:number,dur:number,vol:number)=>{
+   const n=Math.floor(ctx.sampleRate*dur),buf=ctx.createBuffer(1,n,ctx.sampleRate),data=buf.getChannelData(0);
+   for(let i=0;i<n;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/n,2.2);
+   const src=ctx.createBufferSource(),g=ctx.createGain(),bp=ctx.createBiquadFilter();
+   bp.type="bandpass";bp.frequency.value=2400;bp.Q.value=1.2;
+   src.buffer=buf;
+   g.gain.setValueAtTime(.0001,t0+at);
+   g.gain.exponentialRampToValueAtTime(vol,t0+at+.01);
+   g.gain.exponentialRampToValueAtTime(.0001,t0+at+dur);
+   src.connect(bp);bp.connect(g);g.connect(filter);
+   src.start(t0+at);src.stop(t0+at+dur+.02);
   };
   if(kind==="good"){
-   filter.frequency.setValueAtTime(4200,t0);
-   filter.frequency.exponentialRampToValueAtTime(2800,t0+.7);
-   // warm major sparkle: C5 E5 G5 B5 + soft chord swell
-   [[523.25,.0,.38,.1],[659.25,.09,.4,.095],[783.99,.18,.42,.09],[987.77,.28,.48,.08]].forEach(([f,at,dur,vol])=>note(f,at,dur,vol,"sine"));
-   // soft pad underneath
-   note(261.63,.02,.55,.045,"sine");
-   note(392,.05,.5,.035,"sine");
+   filter.frequency.setValueAtTime(5200,t0);
+   filter.frequency.exponentialRampToValueAtTime(2600,t0+.9);
+   // fireworks whoosh + sparkle chord
+   crackle(0,.18,.14);
+   crackle(.08,.22,.1);
+   crackle(.2,.16,.08);
+   [[523.25,.05,.42,.11],[659.25,.14,.44,.1],[783.99,.24,.46,.095],[1046.5,.34,.5,.085],[1318.5,.42,.38,.05]].forEach(([f,at,dur,vol])=>note(f,at,dur,vol,"sine"));
+   note(261.63,.04,.62,.05,"sine");
+   note(392,.08,.55,.04,"sine");
+   note(523.25,.5,.35,.04,"sine");
   }else{
-   filter.frequency.setValueAtTime(1800,t0);
-   filter.frequency.exponentialRampToValueAtTime(700,t0+.45);
-   feedback.gain.value=.12;
-   wet.gain.value=.18;
-   // soft regret: gentle minor fall, not harsh
-   note(311.13,0,.32,.07,"sine",246.94);
-   note(246.94,.12,.38,.055,"sine",196);
-   note(196,.22,.42,.04,"triangle");
+   filter.frequency.setValueAtTime(2000,t0);
+   filter.frequency.exponentialRampToValueAtTime(650,t0+.5);
+   feedback.gain.value=.14;
+   wet.gain.value=.2;
+   note(349.23,0,.28,.075,"sine",277.18);
+   note(277.18,.1,.34,.06,"sine",220);
+   note(220,.2,.4,.045,"triangle",174.61);
+   crackle(.02,.08,.035);
   }
  }catch{}},[]);
+ const burstFireworks=useCallback(()=>{
+  const bursts=Array.from({length:5},(_,b)=>({id:b,x:18+Math.random()*64,y:12+Math.random()*48,hue:Math.floor(Math.random()*360),delay:b*.08}));
+  setFireworks(bursts);
+  window.setTimeout(()=>setFireworks([]),1800);
+ },[]);
  const romajiHitTrack=(t:Track,q:string)=>{const alts=animeRomajiByCanon[canonicalTitle(t.trackName)]||[];return alts.some(a=>canonicalTitle(a).includes(q)||q.includes(canonicalTitle(a)))};
  const stopVisualizer=useCallback(()=>{if(animation.current)cancelAnimationFrame(animation.current);animation.current=null;wave.current?.querySelectorAll<HTMLElement>(".bar").forEach(bar=>{bar.style.removeProperty("height");bar.style.removeProperty("opacity")})},[]);
  const suggestions=useMemo(()=>{const q=norm(guess);if(q.length<2)return [];const candidates=[...(current?[current]:[]),...tracks].filter(t=>norm(t.trackName).includes(q)||norm(t.artistName).includes(q)||canonicalTitle(t.trackName).includes(q)||animeHit(t,q)||romajiHitTrack(t,q)).sort((a,b)=>Number(edition.test(a.trackName))-Number(edition.test(b.trackName)));const unique=candidates.filter((t,i,a)=>a.findIndex(x=>`${canonicalTitle(x.trackName)}|${norm(x.artistName)}`===`${canonicalTitle(t.trackName)}|${norm(t.artistName)}`)===i);return unique.map(t=>{const artist=norm(t.artistName),title=canonicalTitle(t.trackName),anime=norm(animeOf(t)||"");const rank=artist===q?0:title.startsWith(q)?1:anime.includes(q)||animeHit(t,q)?2:artist.startsWith(q)?3:title.includes(q)?4:5;return{t,rank}}).sort((a,b)=>a.rank-b.rank||a.t.artistName.localeCompare(b.t.artistName)).slice(0,8).map(x=>x.t)},[guess,tracks,current]);
@@ -141,33 +162,39 @@ export default function SongGame(){
  useEffect(()=>{const close=(e:MouseEvent)=>{if(searchbox.current&&!searchbox.current.contains(e.target as Node))setSuggestionsOpen(false)};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[]);
  const play=(restart=false,requestedLevel=level)=>{const a=audio.current;if(!a||!current)return;if(!restart&&!paused.current&&remaining.current>0){remaining.current=Math.max(0,remaining.current-(performance.now()-started.current));paused.current=true;if(timer.current)clearTimeout(timer.current);stopVisualizer();a.pause();setPlaying(false);return}if(restart){if(timer.current)clearTimeout(timer.current);stopVisualizer();a.pause();paused.current=false;remaining.current=0}if(!paused.current||remaining.current<=0){a.currentTime=cuePoints[current.trackId]??2.5;remaining.current=limits[requestedLevel]*1000}void startVisualizer();a.play().then(()=>{started.current=performance.now();paused.current=false;setPlaying(true);timer.current=setTimeout(finish,remaining.current)}).catch(()=>{setMessage("Тоглож чадсангүй");setKind("bad")})};
  const snapshot=(t:Track,ok:boolean)=>{const anime=animeOf(t),romaji=romajiOf(t);return{trackName:t.trackName,artistName:t.artistName,romaji,anime,spotify:spotifyUrl(t),youtube:youtubeUrl(t),artwork:t.artworkUrl100,ok}};
- const reveal=(ok:boolean)=>{if(!current)return;finish();void playSfx(ok?"good":"bad");const info=snapshot(current,ok);setRevealInfo(info);if(!ok)setLastSkipped(info);setRevealed(true);setSuggestionsOpen(false);setMessage("");setKind(ok?"good":"bad");setTimeout(()=>{setRound(r=>r>=10?1:r+1);if(!takeNext(tracks))load()},3200)};
+ const reveal=(ok:boolean)=>{if(!current)return;finish();void playSfx(ok?"good":"bad");if(ok)burstFireworks();const info=snapshot(current,ok);setRevealInfo(info);if(!ok)setLastSkipped(info);setRevealed(true);setSuggestionsOpen(false);setMessage("");setKind(ok?"good":"bad");setTimeout(()=>{setRound(r=>r>=10?1:r+1);if(!takeNext(tracks))load()},3200)};
  const submit=()=>{if(!current||revealed)return;const q=norm(guess);if(q.length<2){void playSfx("bad");setMessage("Нэрээ бич");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450);return}const picked=selected==null?null:[current,...tracks].find(t=>t.trackId===selected)??null;const ok=guessCorrect(guess,current,picked,selected);if(ok){setScore(s=>s+Math.max(20,100-level*20));setStreak(s=>s+1);reveal(true)}else{void playSfx("bad");setStreak(0);setMessage("Буруу");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450)}};
  const volTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const bumpVolRef=useRef<(d:number)=>void>(()=>{});
  const bumpVol=(delta:number)=>{setVolume(v=>Math.min(1,Math.max(0,Math.round((v+delta)*20)/20)));if(volTimer.current)clearTimeout(volTimer.current);setVolPulse(true);volTimer.current=setTimeout(()=>setVolPulse(false),280)};
  bumpVolRef.current=bumpVol;
+ const bumpSfx=(delta:number)=>{setSfxVolume(v=>{const n=Math.min(1,Math.max(0,Math.round((v+delta)*20)/20));sfxVolRef.current=n;return n});setSfxPulse(true);window.setTimeout(()=>setSfxPulse(false),280)};
  const scrubVol=(e:React.PointerEvent<HTMLDivElement>,vertical:boolean)=>{const rect=e.currentTarget.getBoundingClientRect();const raw=vertical?1-(e.clientY-rect.top)/Math.max(rect.height,1):(e.clientX-rect.left)/Math.max(rect.width,1);setVolume(Math.min(1,Math.max(0,Math.round(raw*20)/20)));if(volTimer.current)clearTimeout(volTimer.current);setVolPulse(true);volTimer.current=setTimeout(()=>setVolPulse(false),280)};
- useEffect(()=>{const onWheel=(e:WheelEvent)=>{const el=(e.target as Element|null)?.closest?.(".vol-ctrl");if(!el)return;e.preventDefault();bumpVolRef.current(e.deltaY<0||e.deltaX<0?.05:-.05)};document.addEventListener("wheel",onWheel,{passive:false,capture:true});return()=>document.removeEventListener("wheel",onWheel,true)},[]);
- const volCtrl=(vertical:boolean)=>(
-  <div className={`vol-ctrl ${vertical?"vert":"horiz"} ${volPulse?"pulse":""}`}>
-   <button type="button" className="vol-btn" aria-label="Багасгах" onClick={()=>bumpVol(-.05)}>−</button>
+ const scrubSfx=(e:React.PointerEvent<HTMLDivElement>,vertical:boolean)=>{const rect=e.currentTarget.getBoundingClientRect();const raw=vertical?1-(e.clientY-rect.top)/Math.max(rect.height,1):(e.clientX-rect.left)/Math.max(rect.width,1);const n=Math.min(1,Math.max(0,Math.round(raw*20)/20));sfxVolRef.current=n;setSfxVolume(n);setSfxPulse(true);window.setTimeout(()=>setSfxPulse(false),280)};
+ const bumpSfxRef=useRef(bumpSfx);bumpSfxRef.current=bumpSfx;
+ useEffect(()=>{const onWheel=(e:WheelEvent)=>{const el=(e.target as Element|null)?.closest?.(".vol-ctrl");if(!el)return;e.preventDefault();const delta=e.deltaY<0||e.deltaX<0?.05:-.05;if(el.classList.contains("sfx"))bumpSfxRef.current(delta);else bumpVolRef.current(delta)};document.addEventListener("wheel",onWheel,{passive:false,capture:true});return()=>document.removeEventListener("wheel",onWheel,true)},[]);
+ const volCtrl=(vertical:boolean,kind:"music"|"sfx")=>{
+  const isSfx=kind==="sfx",val=isSfx?sfxVolume:volume,pulse=isSfx?sfxPulse:volPulse;
+  return (
+  <div className={`vol-ctrl ${vertical?"vert":"horiz"} ${isSfx?"sfx":"music"} ${pulse?"pulse":""}`}>
+   <span className="vol-tag">{isSfx?"SFX":"♪"}</span>
+   <button type="button" className="vol-btn" aria-label="Багасгах" onClick={()=>isSfx?bumpSfx(-.05):bumpVol(-.05)}>−</button>
    <div
     className="vol-meter"
     role="slider"
     tabIndex={0}
     aria-valuemin={0}
     aria-valuemax={100}
-    aria-valuenow={Math.round(volume*100)}
-    aria-label="Дууны чанга"
-    onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);scrubVol(e,vertical)}}
-    onPointerMove={e=>{if(e.buttons)scrubVol(e,vertical)}}
-    onKeyDown={e=>{if(e.key==="ArrowUp"||e.key==="ArrowRight"){e.preventDefault();bumpVol(.05)}if(e.key==="ArrowDown"||e.key==="ArrowLeft"){e.preventDefault();bumpVol(-.05)}}}
-   ><i style={{"--p":`${Math.round(volume*100)}%`} as React.CSSProperties}/></div>
-   <button type="button" className="vol-btn" aria-label="Нэмэх" onClick={()=>bumpVol(.05)}>+</button>
-   <span className="vol-pct">{Math.round(volume*100)}</span>
+    aria-valuenow={Math.round(val*100)}
+    aria-label={isSfx?"SFX чанга":"Дууны чанга"}
+    onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);(isSfx?scrubSfx:scrubVol)(e,vertical)}}
+    onPointerMove={e=>{if(e.buttons)(isSfx?scrubSfx:scrubVol)(e,vertical)}}
+    onKeyDown={e=>{if(e.key==="ArrowUp"||e.key==="ArrowRight"){e.preventDefault();isSfx?bumpSfx(.05):bumpVol(.05)}if(e.key==="ArrowDown"||e.key==="ArrowLeft"){e.preventDefault();isSfx?bumpSfx(-.05):bumpVol(-.05)}}}
+   ><i style={{"--p":`${Math.round(val*100)}%`} as React.CSSProperties}/></div>
+   <button type="button" className="vol-btn" aria-label="Нэмэх" onClick={()=>isSfx?bumpSfx(.05):bumpVol(.05)}>+</button>
+   <span className="vol-pct">{Math.round(val*100)}</span>
   </div>
- );
+ )};
  return (
   <main className="shell">
    <aside className="rail">
@@ -178,7 +205,10 @@ export default function SongGame(){
      ))}</div>
     </div>
     <button className="reset" onClick={()=>{setScore(0);setStreak(0);setRound(1);load()}} title="Шинээр">↻</button>
-    <div className="vol-rail">{volCtrl(true)}</div>
+    <div className="vol-rail">
+     {volCtrl(true,"music")}
+     {volCtrl(true,"sfx")}
+    </div>
    </aside>
 
    <section className="stage">
@@ -190,7 +220,10 @@ export default function SongGame(){
      <div className="stats"><b>{score}</b><span>оноо</span><i/><b>{streak}</b><span>streak</span><i/><b>{round}/10</b></div>
     </header>
 
-    <div className="vol-mobile">{volCtrl(false)}</div>
+    <div className="vol-mobile">
+     {volCtrl(false,"music")}
+     {volCtrl(false,"sfx")}
+    </div>
 
     <nav className="genres">{visibleGenres(mode).map(g=>(
      <button key={g} className={`chip ${genre===g?"active":""}`} onClick={()=>{setGenre(g);setRound(1)}}>{genreLabel(g)}</button>
@@ -253,6 +286,15 @@ export default function SongGame(){
 
     {revealed&&revealInfo&&(
      <div className="reveal-overlay" role="dialog" aria-modal="true">
+      {revealInfo.ok&&fireworks.length>0&&(
+       <div className="fw-layer" aria-hidden>
+        {fireworks.map(burst=>(
+         <div key={burst.id} className="fw-burst" style={{"--x":`${burst.x}%`,"--y":`${burst.y}%`,"--hue":burst.hue,"--d":`${burst.delay}s`} as React.CSSProperties}>
+          {Array.from({length:18},(_,i)=><i key={i} className="fw-spark" style={{"--a":`${i*20}deg`} as React.CSSProperties}/>)}
+         </div>
+        ))}
+       </div>
+      )}
       <div className={`reveal ${kind}`}>
        <small>{revealInfo.ok?"ЗӨВ":"ХАРИУЛТ"}</small>
        {revealInfo.anime&&<p className="reveal-anime reveal-anime-top"><span className="reveal-anime-label">Anime</span>{revealInfo.anime}</p>}
