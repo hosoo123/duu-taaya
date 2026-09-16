@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
-import {animeRomajiByCanon,animeSources,animeSourcesByTitle,cuePoints,difficultyLimits,foreignFeatured,foreignPools,mongolianFeatured,mongolianPools,type Difficulty,type Genre,type Mode} from "@/data/catalog";
+import {animeRomajiByCanon,animeRomajiDisplay,animeSources,animeSourcesByTitle,cuePoints,difficultyLimits,foreignFeatured,foreignPools,mongolianFeatured,mongolianPools,type Difficulty,type Genre,type Mode} from "@/data/catalog";
 type Track={trackId:number;artistId:number;trackName:string;artistName:string;previewUrl:string;artworkUrl100?:string;releaseDate?:string;collectionName?:string;wrapperType:string};
 const genres:Genre[]=["all","new","hiphop","pop","rock","traditional","anime"];
 const instrumental=/\b(instrumental|karaoke|backing track|minus one|no vocals?|vocal off|off vocal|beat only)\b|зөвхөн ая|ая хувилбар/i;
@@ -13,6 +13,7 @@ const titleHits=(guess:string,title:string)=>{const q=canonicalTitle(guess),t=ca
 const romajiHits=(guess:string,track:Track)=>{const key=canonicalTitle(track.trackName);const alts=animeRomajiByCanon[key]||[];return alts.some(alt=>titleHits(guess,alt))};
 const guessCorrect=(guess:string,track:Track,picked:Track|null,selectedId:number|null)=>selectedId===track.trackId||(!!picked&&sameSong(picked,track))||titleHits(guess,track.trackName)||romajiHits(guess,track);
 const animeOf=(t:Track)=>animeSources[t.trackId]||animeSourcesByTitle[canonicalTitle(t.trackName)]||null;
+const romajiOf=(t:Track)=>animeRomajiDisplay[canonicalTitle(t.trackName)]||null;
 const animeAliases:Record<string,string[]>={
  "demonslayerkimetsunoyaiba":["demonslayer","kimetsu","kny"],
  "demonslayermugentrain":["demonslayer","mugentrain","kimetsu"],
@@ -71,6 +72,7 @@ export default function SongGame(){
  const scrubVol=(e:React.PointerEvent<HTMLDivElement>,vertical:boolean)=>{const rect=e.currentTarget.getBoundingClientRect();const raw=vertical?1-(e.clientY-rect.top)/Math.max(rect.height,1):(e.clientX-rect.left)/Math.max(rect.width,1);setVolume(Math.min(1,Math.max(0,Math.round(raw*20)/20)));if(volTimer.current)clearTimeout(volTimer.current);setVolPulse(true);volTimer.current=setTimeout(()=>setVolPulse(false),280)};
  useEffect(()=>{const onWheel=(e:WheelEvent)=>{const el=(e.target as Element|null)?.closest?.(".vol-ctrl");if(!el)return;e.preventDefault();bumpVolRef.current(e.deltaY<0||e.deltaX<0?.05:-.05)};document.addEventListener("wheel",onWheel,{passive:false,capture:true});return()=>document.removeEventListener("wheel",onWheel,true)},[]);
  const animeName=current?animeOf(current):null;
+ const romajiName=current?romajiOf(current):null;
  const volCtrl=(vertical:boolean)=>(
   <div className={`vol-ctrl ${vertical?"vert":"horiz"} ${volPulse?"pulse":""}`}>
    <button type="button" className="vol-btn" aria-label="Багасгах" onClick={()=>bumpVol(-.05)}>−</button>
@@ -128,21 +130,26 @@ export default function SongGame(){
     <div className="secs"><b>{limits[level]}</b>s</div>
     <div className="steps">{limits.map((_,i)=><i key={i} className={`step ${i<=level?"on":""}`}/>)}</div>
 
-    <div className={`answer ${shaking?"shake":""}`}>
-     <div className="searchbox" ref={searchbox}>
-      {suggestionsOpen&&suggestions.length>0&&(
-       <div className="suggestions">
-        {suggestions.map(t=>{const anime=animeOf(t);return(
-         <button type="button" className="suggestion" key={t.trackId} onClick={()=>{setSelected(t.trackId);setGuess(t.trackName);setSuggestionsOpen(false)}}>
-          <b>{t.trackName}</b>
-          <span>{t.artistName}{anime?` · ${anime}`:""}</span>
-         </button>
-        )})}
-       </div>
-      )}
-      <input value={guess} onFocus={()=>setSuggestionsOpen(true)} onChange={e=>{setGuess(e.target.value);setSelected(null);setSuggestionsOpen(true)}} onKeyDown={e=>e.key==="Enter"&&submit()} autoComplete="off" spellCheck={false} placeholder="Дуу / anime нэр…"/>
+    <div className={`answer-wrap ${shaking?"shake":""}`}>
+     <div className={`answer ${suggestionsOpen&&suggestions.length>0?"open":""}`}>
+      <div className="searchbox" ref={searchbox}>
+       {suggestionsOpen&&suggestions.length>0&&(
+        <ul className="suggestions" role="listbox">
+         {suggestions.map(t=>{const anime=animeOf(t),romaji=romajiOf(t);return(
+          <li key={t.trackId}>
+           <button type="button" className="suggestion" role="option" onClick={()=>{setSelected(t.trackId);setGuess(romaji||t.trackName);setSuggestionsOpen(false)}}>
+            <b>{romaji||t.trackName}</b>
+            {romaji&&t.trackName!==romaji&&<em>{t.trackName}</em>}
+            <span>{t.artistName}{anime?` · ${anime}`:""}</span>
+           </button>
+          </li>
+         )})}
+        </ul>
+       )}
+       <input value={guess} onFocus={()=>setSuggestionsOpen(true)} onChange={e=>{setGuess(e.target.value);setSelected(null);setSuggestionsOpen(true)}} onKeyDown={e=>{if(e.key==="Enter")submit();if(e.key==="Escape")setSuggestionsOpen(false)}} autoComplete="off" spellCheck={false} placeholder="Romaji / дууны нэр…"/>
+      </div>
+      <button className="go" type="button" onClick={submit}>Таах</button>
      </div>
-     <button className="go" onClick={submit}>Таах</button>
     </div>
 
     <div className="actions">
@@ -158,8 +165,9 @@ export default function SongGame(){
        <small>{kind==="good"?"ЗӨВ":"ХАРИУЛТ"}</small>
        {current.artworkUrl100&&<img src={current.artworkUrl100.replace("100x100","300x300")} alt=""/>}
        <strong>{current.trackName}</strong>
+       {romajiName&&romajiName!==current.trackName&&<p className="reveal-romaji">{romajiName}</p>}
        <span>{current.artistName}</span>
-       {animeName&&<p className={`reveal-anime ${kind!=="good"?"reveal-anime-top":""}`}>{kind!=="good"?"🎬 Anime · ":"Anime · "}{animeName}</p>}
+       {animeName&&<p className={`reveal-anime ${kind!=="good"?"reveal-anime-top":""}`}><span className="reveal-anime-label">Ашигласан anime</span>{animeName}</p>}
       </div>
      </div>
     )}
