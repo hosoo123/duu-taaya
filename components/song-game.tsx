@@ -64,7 +64,71 @@ const genreLabel=(g:Genre)=>g==="all"?"Бүгд":g==="new"?"Шинэ":g==="tradi
 export default function SongGame(){
  const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[revealInfo,setRevealInfo]=useState<(SkippedInfo&{artwork?:string;ok:boolean})|null>(null),[lastSkipped,setLastSkipped]=useState<SkippedInfo|null>(null),[volume,setVolume]=useState(.75),[volPulse,setVolPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false);
  const audio=useRef<HTMLAudioElement>(null),wave=useRef<HTMLDivElement>(null),searchbox=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),animation=useRef<number|null>(null),audioContext=useRef<AudioContext|null>(null),sfxContext=useRef<AudioContext|null>(null),analyser=useRef<AnalyserNode|null>(null),mediaSource=useRef<MediaElementAudioSourceNode|null>(null),remaining=useRef(0),started=useRef(0),paused=useRef(false),limits=difficultyLimits[difficulty];
- const playSfx=useCallback(async(kind:"good"|"bad")=>{try{const AC=window.AudioContext||(window as typeof window&{webkitAudioContext:typeof AudioContext}).webkitAudioContext;if(!sfxContext.current)sfxContext.current=new AC();const ctx=sfxContext.current;if(ctx.state==="suspended")await ctx.resume();const t0=ctx.currentTime;const beep=(freq:number,at:number,dur:number,type:OscillatorType,vol:number)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t0+at);g.gain.setValueAtTime(.0001,t0+at);g.gain.exponentialRampToValueAtTime(vol,t0+at+.018);g.gain.exponentialRampToValueAtTime(.0001,t0+at+dur);o.connect(g);g.connect(ctx.destination);o.start(t0+at);o.stop(t0+at+dur+.03)};if(kind==="good"){[523.25,659.25,783.99,1046.5].forEach((f,i)=>beep(f,i*.07,.2,"sine",.11))}else{beep(240,0,.14,"triangle",.09);beep(160,.09,.2,"triangle",.07)}}catch{}},[]);
+ const playSfx=useCallback(async(kind:"good"|"bad")=>{try{
+  const AC=window.AudioContext||(window as typeof window&{webkitAudioContext:typeof AudioContext}).webkitAudioContext;
+  if(!sfxContext.current)sfxContext.current=new AC();
+  const ctx=sfxContext.current;
+  if(ctx.state==="suspended")await ctx.resume();
+  const t0=ctx.currentTime;
+  const master=ctx.createGain();
+  master.gain.value=.85;
+  const filter=ctx.createBiquadFilter();
+  filter.type="lowpass";
+  filter.Q.value=.7;
+  const delay=ctx.createDelay(0.5);
+  delay.delayTime.value=.12;
+  const feedback=ctx.createGain();
+  feedback.gain.value=.22;
+  const wet=ctx.createGain();
+  wet.gain.value=.28;
+  const dry=ctx.createGain();
+  dry.gain.value=.72;
+  filter.connect(dry);dry.connect(master);
+  filter.connect(delay);delay.connect(wet);wet.connect(master);
+  delay.connect(feedback);feedback.connect(delay);
+  master.connect(ctx.destination);
+  const note=(freq:number,at:number,dur:number,vol:number,type:OscillatorType="sine",slideTo?:number)=>{
+   const o=ctx.createOscillator(),g=ctx.createGain(),p=ctx.createGain();
+   o.type=type;
+   o.frequency.setValueAtTime(freq,t0+at);
+   if(slideTo)o.frequency.exponentialRampToValueAtTime(slideTo,t0+at+dur*.85);
+   g.gain.setValueAtTime(.0001,t0+at);
+   g.gain.exponentialRampToValueAtTime(vol,t0+at+.04);
+   g.gain.setValueAtTime(vol*.92,t0+at+dur*.35);
+   g.gain.exponentialRampToValueAtTime(.0001,t0+at+dur);
+   p.gain.value=.55;
+   o.connect(g);g.connect(p);p.connect(filter);
+   // soft harmonic shimmer
+   const h=ctx.createOscillator(),hg=ctx.createGain();
+   h.type="triangle";
+   h.frequency.setValueAtTime(freq*2,t0+at);
+   if(slideTo)h.frequency.exponentialRampToValueAtTime(slideTo*2,t0+at+dur*.85);
+   hg.gain.setValueAtTime(.0001,t0+at);
+   hg.gain.exponentialRampToValueAtTime(vol*.18,t0+at+.05);
+   hg.gain.exponentialRampToValueAtTime(.0001,t0+at+dur*.9);
+   h.connect(hg);hg.connect(filter);
+   o.start(t0+at);o.stop(t0+at+dur+.05);
+   h.start(t0+at);h.stop(t0+at+dur+.05);
+  };
+  if(kind==="good"){
+   filter.frequency.setValueAtTime(4200,t0);
+   filter.frequency.exponentialRampToValueAtTime(2800,t0+.7);
+   // warm major sparkle: C5 E5 G5 B5 + soft chord swell
+   [[523.25,.0,.38,.1],[659.25,.09,.4,.095],[783.99,.18,.42,.09],[987.77,.28,.48,.08]].forEach(([f,at,dur,vol])=>note(f,at,dur,vol,"sine"));
+   // soft pad underneath
+   note(261.63,.02,.55,.045,"sine");
+   note(392,.05,.5,.035,"sine");
+  }else{
+   filter.frequency.setValueAtTime(1800,t0);
+   filter.frequency.exponentialRampToValueAtTime(700,t0+.45);
+   feedback.gain.value=.12;
+   wet.gain.value=.18;
+   // soft regret: gentle minor fall, not harsh
+   note(311.13,0,.32,.07,"sine",246.94);
+   note(246.94,.12,.38,.055,"sine",196);
+   note(196,.22,.42,.04,"triangle");
+  }
+ }catch{}},[]);
  const romajiHitTrack=(t:Track,q:string)=>{const alts=animeRomajiByCanon[canonicalTitle(t.trackName)]||[];return alts.some(a=>canonicalTitle(a).includes(q)||q.includes(canonicalTitle(a)))};
  const stopVisualizer=useCallback(()=>{if(animation.current)cancelAnimationFrame(animation.current);animation.current=null;wave.current?.querySelectorAll<HTMLElement>(".bar").forEach(bar=>{bar.style.removeProperty("height");bar.style.removeProperty("opacity")})},[]);
  const suggestions=useMemo(()=>{const q=norm(guess);if(q.length<2)return [];const candidates=[...(current?[current]:[]),...tracks].filter(t=>norm(t.trackName).includes(q)||norm(t.artistName).includes(q)||canonicalTitle(t.trackName).includes(q)||animeHit(t,q)||romajiHitTrack(t,q)).sort((a,b)=>Number(edition.test(a.trackName))-Number(edition.test(b.trackName)));const unique=candidates.filter((t,i,a)=>a.findIndex(x=>`${canonicalTitle(x.trackName)}|${norm(x.artistName)}`===`${canonicalTitle(t.trackName)}|${norm(t.artistName)}`)===i);return unique.map(t=>{const artist=norm(t.artistName),title=canonicalTitle(t.trackName),anime=norm(animeOf(t)||"");const rank=artist===q?0:title.startsWith(q)?1:anime.includes(q)||animeHit(t,q)?2:artist.startsWith(q)?3:title.includes(q)?4:5;return{t,rank}}).sort((a,b)=>a.rank-b.rank||a.t.artistName.localeCompare(b.t.artistName)).slice(0,8).map(x=>x.t)},[guess,tracks,current]);
