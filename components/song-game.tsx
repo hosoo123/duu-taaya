@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {animeRomajiByCanon,animeRomajiDisplay,animeSources,animeSourcesByTitle,cuePoints,difficultyLimits,foreignFeatured,foreignPools,mongolianFeatured,mongolianPools,type Difficulty,type Genre,type Mode} from "@/data/catalog";
 type Track={trackId:number;artistId:number;trackName:string;artistName:string;previewUrl:string;artworkUrl100?:string;releaseDate?:string;collectionName?:string;wrapperType:string};
-const genres:Genre[]=["all","new","hiphop","pop","rock","traditional","anime","animeAlt"];
+const genres:Genre[]=["all","new","hiphop","pop","rock","traditional","anime","jpop"];
 const instrumental=/\b(instrumental|karaoke|backing track|minus one|no vocals?|vocal off|off vocal|beat only)\b|зөвхөн ая|ая хувилбар/i;
 const edition=/\b(remaster(?:ed)?|live|remix|acoustic|instrumental|karaoke|radio edit|sped up|slowed|version|edit)\b/i;
 const norm=(s:string)=>(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zа-яөүё0-9]/gi,"");
@@ -12,8 +12,12 @@ const sameSong=(a:Track,b:Track)=>canonicalTitle(a.trackName)===canonicalTitle(b
 const titleHits=(guess:string,title:string)=>{const q=canonicalTitle(guess),t=canonicalTitle(title);if(!q||!t)return false;if(q===t)return true;const need=Math.max(5,Math.ceil(t.length*.85));if(q.length<need)return false;const maxDist=t.length<=5?0:t.length<=10?1:t.length<=18?2:3;return distance(q,t)<=maxDist};
 const romajiHits=(guess:string,track:Track)=>{const key=canonicalTitle(track.trackName);const alts=animeRomajiByCanon[key]||[];return alts.some(alt=>titleHits(guess,alt))};
 const guessCorrect=(guess:string,track:Track,picked:Track|null,selectedId:number|null)=>selectedId===track.trackId||(!!picked&&sameSong(picked,track))||titleHits(guess,track.trackName)||romajiHits(guess,track);
-const animeOf=(t:Track)=>animeSources[t.trackId]||animeSourcesByTitle[canonicalTitle(t.trackName)]||null;
-const romajiOf=(t:Track)=>animeRomajiDisplay[canonicalTitle(t.trackName)]||null;
+const animeOf=(t:Track)=>{if(animeSources[t.trackId])return animeSources[t.trackId];const c=canonicalTitle(t.trackName);if(animeSourcesByTitle[c])return animeSourcesByTitle[c];const hit=Object.entries(animeSourcesByTitle).find(([k])=>c.length>=4&&(c.includes(k)||k.includes(c)));return hit?hit[1]:null};
+const romajiOf=(t:Track)=>{const c=canonicalTitle(t.trackName);if(animeRomajiDisplay[c])return animeRomajiDisplay[c];const hit=Object.entries(animeRomajiDisplay).find(([k])=>c.length>=4&&(c.includes(k)||k.includes(c)));return hit?hit[1]:null};
+const listenQuery=(t:Track)=>{const r=romajiOf(t),a=animeOf(t);return encodeURIComponent([r||t.trackName,t.artistName,a?`anime ${a}`:""].filter(Boolean).join(" "))};
+const spotifyUrl=(t:Track)=>`https://open.spotify.com/search/${listenQuery(t)}`;
+const youtubeUrl=(t:Track)=>`https://www.youtube.com/results?search_query=${listenQuery(t)}`;
+type SkippedInfo={trackName:string;artistName:string;romaji:string|null;anime:string|null;spotify:string;youtube:string};
 const animeAliases:Record<string,string[]>={
  "demonslayerkimetsunoyaiba":["demonslayer","kimetsu","kny"],
  "demonslayermugentrain":["demonslayer","mugentrain","kimetsu"],
@@ -54,24 +58,25 @@ const animeAliases:Record<string,string[]>={
 };
 const animeHit=(t:Track,q:string)=>{const a=animeOf(t);if(!a||q.length<2)return false;const na=norm(a);if(na.includes(q))return true;const aliases=animeAliases[na]||[];return aliases.some(x=>x.includes(q)||q.includes(x))};
 const shuffle=<T,>(x:T[])=>{const a=[...x];for(let i=a.length-1;i>0;i--){const n=new Uint32Array(1);crypto.getRandomValues(n);const j=n[0]%(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
-const visibleGenres=(mode:Mode)=>genres.filter(g=>mode==="mongolian"?g!=="anime"&&g!=="animeAlt":g!=="traditional");
+const visibleGenres=(mode:Mode)=>genres.filter(g=>mode==="mongolian"?g!=="anime"&&g!=="jpop":g!=="traditional");
 const diffLabel:Record<Difficulty,string>={easy:"Easy",medium:"Med",hard:"Hard",expert:"Pro"};
-const genreLabel=(g:Genre)=>g==="all"?"Бүгд":g==="new"?"Шинэ":g==="traditional"?"Зохиол":g==="anime"?"J-pop OP":g==="animeAlt"?"J-pop биш":g==="hiphop"?"Hip-Hop":g==="pop"?"Pop":"Rock";
+const genreLabel=(g:Genre)=>g==="all"?"Бүгд":g==="new"?"Шинэ":g==="traditional"?"Зохиол":g==="anime"?"Anime OP":g==="jpop"?"J-pop":g==="hiphop"?"Hip-Hop":g==="pop"?"Pop":"Rock";
 export default function SongGame(){
- const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[volume,setVolume]=useState(.75),[volPulse,setVolPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false);
+ const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[revealInfo,setRevealInfo]=useState<(SkippedInfo&{artwork?:string;ok:boolean})|null>(null),[lastSkipped,setLastSkipped]=useState<SkippedInfo|null>(null),[volume,setVolume]=useState(.75),[volPulse,setVolPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false);
  const audio=useRef<HTMLAudioElement>(null),wave=useRef<HTMLDivElement>(null),searchbox=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),animation=useRef<number|null>(null),audioContext=useRef<AudioContext|null>(null),analyser=useRef<AnalyserNode|null>(null),mediaSource=useRef<MediaElementAudioSourceNode|null>(null),remaining=useRef(0),started=useRef(0),paused=useRef(false),limits=difficultyLimits[difficulty];
  const romajiHitTrack=(t:Track,q:string)=>{const alts=animeRomajiByCanon[canonicalTitle(t.trackName)]||[];return alts.some(a=>canonicalTitle(a).includes(q)||q.includes(canonicalTitle(a)))};
  const suggestions=useMemo(()=>{const q=norm(guess);if(q.length<2)return [];const candidates=[...(current?[current]:[]),...tracks].filter(t=>norm(t.trackName).includes(q)||norm(t.artistName).includes(q)||canonicalTitle(t.trackName).includes(q)||animeHit(t,q)||romajiHitTrack(t,q)).sort((a,b)=>Number(edition.test(a.trackName))-Number(edition.test(b.trackName)));const unique=candidates.filter((t,i,a)=>a.findIndex(x=>`${canonicalTitle(x.trackName)}|${norm(x.artistName)}`===`${canonicalTitle(t.trackName)}|${norm(t.artistName)}`)===i);return unique.map(t=>{const artist=norm(t.artistName),title=canonicalTitle(t.trackName),anime=norm(animeOf(t)||"");const rank=artist===q?0:title.startsWith(q)?1:anime.includes(q)||animeHit(t,q)?2:artist.startsWith(q)?3:title.includes(q)?4:5;return{t,rank}}).sort((a,b)=>a.rank-b.rank||a.t.artistName.localeCompare(b.t.artistName)).slice(0,8).map(x=>x.t)},[guess,tracks,current]);
  const stopVisualizer=useCallback(()=>{if(animation.current)cancelAnimationFrame(animation.current);animation.current=null;wave.current?.querySelectorAll<HTMLElement>(".bar").forEach(bar=>{bar.style.removeProperty("height");bar.style.removeProperty("opacity")})},[]);
  const startVisualizer=useCallback(async()=>{const a=audio.current,w=wave.current;if(!a||!w)return;try{const AudioContextClass=window.AudioContext||(window as typeof window&{webkitAudioContext:typeof AudioContext}).webkitAudioContext;if(!audioContext.current)audioContext.current=new AudioContextClass();const ctx=audioContext.current;if(ctx.state==="suspended")await ctx.resume();if(!mediaSource.current){mediaSource.current=ctx.createMediaElementSource(a);analyser.current=ctx.createAnalyser();analyser.current.fftSize=128;analyser.current.smoothingTimeConstant=.78;mediaSource.current.connect(analyser.current);analyser.current.connect(ctx.destination)}w.classList.remove("fallback");const bars=[...w.querySelectorAll<HTMLElement>(".bar")],data=new Uint8Array(analyser.current!.frequencyBinCount);const tick=()=>{analyser.current!.getByteFrequencyData(data);bars.forEach((bar,i)=>{const mirrored=i<bars.length/2?bars.length/2-1-i:i-bars.length/2;const bin=Math.min(data.length-1,Math.floor(mirrored*data.length/(bars.length/2)));const power=data[bin]/255;bar.style.height=(10+power*108)+"px";bar.style.opacity=String(.28+power*.72)});animation.current=requestAnimationFrame(tick)};stopVisualizer();tick()}catch{w.classList.add("fallback")}},[stopVisualizer]);
  const finish=useCallback(()=>{if(timer.current)clearTimeout(timer.current);stopVisualizer();remaining.current=0;paused.current=false;audio.current?.pause();setPlaying(false)},[stopVisualizer]);
- const takeNext=useCallback((list:Track[])=>{const [item,...rest]=list;if(!item)return false;if(timer.current)clearTimeout(timer.current);audio.current?.pause();try{const old:number[]=JSON.parse(localStorage.getItem("duuTaayaRecent")||"[]");localStorage.setItem("duuTaayaRecent",JSON.stringify([item.trackId,...old.filter(x=>x!==item.trackId)].slice(0,40)))}catch{}setCurrent(item);setTracks(rest);setLevel(0);setGuess("");setSelected(null);setSuggestionsOpen(false);setRevealed(false);setMessage("");setKind("");remaining.current=0;paused.current=false;return true},[]);
- const load=useCallback(async()=>{setLoading(true);setMessage("");setKind("");const pools=mode==="mongolian"?mongolianPools:foreignPools,featured=mode==="mongolian"?mongolianFeatured:foreignFeatured;const ids=genre==="all"||genre==="new"?[...new Set(Object.values(pools).flat())]:(pools as Record<string,number[]>)[genre]||[],featuredIds=genre==="all"||genre==="new"?[...new Set(Object.values(featured).flat())]:(featured as Record<string,number[]>)[genre]||[],artists=new Set(ids),songs=new Set(featuredIds),country=mode==="foreign"?"us":"au";try{const calls=ids.map(id=>fetch(`https://itunes.apple.com/lookup?id=${id}&entity=song&limit=100&country=${country}`).then(r=>r.json()).catch(()=>({results:[]})));if(featuredIds.length)calls.push(fetch(`https://itunes.apple.com/lookup?id=${featuredIds.join(",")}&entity=song&country=${country}`).then(r=>r.json()).catch(()=>({results:[]})));const data=await Promise.all(calls);let list:Track[]=data.flatMap(x=>x.results||[]).filter((x:Track)=>x.wrapperType==="track"&&x.previewUrl&&x.trackName&&x.artistName&&(artists.has(Number(x.artistId))||songs.has(Number(x.trackId))));list=list.filter(x=>!instrumental.test(`${x.trackName} ${x.collectionName||""}`));list=[...new Map(list.map(x=>[x.trackId,x])).values()];if(genre==="new")list=list.filter(x=>x.releaseDate&&new Date(x.releaseDate)>=new Date("2025-01-01"));list=shuffle(list);let recent=new Set<number>();try{recent=new Set(JSON.parse(localStorage.getItem("duuTaayaRecent")||"[]"))}catch{}list.sort((a,b)=>Number(recent.has(a.trackId))-Number(recent.has(b.trackId)));if(!takeNext(list))throw Error()}catch{setMessage("Ачаалж чадсангүй");setKind("bad")}finally{setLoading(false)}},[mode,genre,takeNext]);
+ const takeNext=useCallback((list:Track[])=>{const [item,...rest]=list;if(!item)return false;if(timer.current)clearTimeout(timer.current);audio.current?.pause();try{const old:number[]=JSON.parse(localStorage.getItem("duuTaayaRecent")||"[]");localStorage.setItem("duuTaayaRecent",JSON.stringify([item.trackId,...old.filter(x=>x!==item.trackId)].slice(0,40)))}catch{}setCurrent(item);setTracks(rest);setLevel(0);setGuess("");setSelected(null);setSuggestionsOpen(false);setRevealed(false);setRevealInfo(null);setMessage("");setKind("");remaining.current=0;paused.current=false;return true},[]);
+ const load=useCallback(async()=>{setLoading(true);setMessage("");setKind("");setLastSkipped(null);const pools=mode==="mongolian"?mongolianPools:foreignPools,featured=mode==="mongolian"?mongolianFeatured:foreignFeatured;const ids=genre==="all"||genre==="new"?[...new Set(Object.values(pools).flat())]:(pools as Record<string,number[]>)[genre]||[],featuredIds=genre==="all"||genre==="new"?[...new Set(Object.values(featured).flat())]:(featured as Record<string,number[]>)[genre]||[],artists=new Set(ids),songs=new Set(featuredIds),country=mode==="foreign"?"us":"au";try{const calls=ids.map(id=>fetch(`https://itunes.apple.com/lookup?id=${id}&entity=song&limit=100&country=${country}`).then(r=>r.json()).catch(()=>({results:[]})));if(featuredIds.length)calls.push(fetch(`https://itunes.apple.com/lookup?id=${featuredIds.join(",")}&entity=song&country=${country}`).then(r=>r.json()).catch(()=>({results:[]})));const data=await Promise.all(calls);let list:Track[]=data.flatMap(x=>x.results||[]).filter((x:Track)=>x.wrapperType==="track"&&x.previewUrl&&x.trackName&&x.artistName&&(artists.has(Number(x.artistId))||songs.has(Number(x.trackId))));list=list.filter(x=>!instrumental.test(`${x.trackName} ${x.collectionName||""}`));list=[...new Map(list.map(x=>[x.trackId,x])).values()];if(genre==="new")list=list.filter(x=>x.releaseDate&&new Date(x.releaseDate)>=new Date("2025-01-01"));list=shuffle(list);let recent=new Set<number>();try{recent=new Set(JSON.parse(localStorage.getItem("duuTaayaRecent")||"[]"))}catch{}list.sort((a,b)=>Number(recent.has(a.trackId))-Number(recent.has(b.trackId)));if(!takeNext(list))throw Error()}catch{setMessage("Ачаалж чадсангүй");setKind("bad")}finally{setLoading(false)}},[mode,genre,takeNext]);
  useEffect(()=>{const id=setTimeout(()=>void load(),0);return()=>clearTimeout(id)},[load]);
  useEffect(()=>{if(audio.current)audio.current.volume=volume},[volume]);
  useEffect(()=>{const close=(e:MouseEvent)=>{if(searchbox.current&&!searchbox.current.contains(e.target as Node))setSuggestionsOpen(false)};document.addEventListener("mousedown",close);return()=>document.removeEventListener("mousedown",close)},[]);
  const play=(restart=false,requestedLevel=level)=>{const a=audio.current;if(!a||!current)return;if(!restart&&!paused.current&&remaining.current>0){remaining.current=Math.max(0,remaining.current-(performance.now()-started.current));paused.current=true;if(timer.current)clearTimeout(timer.current);stopVisualizer();a.pause();setPlaying(false);return}if(restart){if(timer.current)clearTimeout(timer.current);stopVisualizer();a.pause();paused.current=false;remaining.current=0}if(!paused.current||remaining.current<=0){a.currentTime=cuePoints[current.trackId]??2.5;remaining.current=limits[requestedLevel]*1000}void startVisualizer();a.play().then(()=>{started.current=performance.now();paused.current=false;setPlaying(true);timer.current=setTimeout(finish,remaining.current)}).catch(()=>{setMessage("Тоглож чадсангүй");setKind("bad")})};
- const reveal=(ok:boolean)=>{setRevealed(true);setSuggestionsOpen(false);setMessage("");setKind(ok?"good":"bad");setTimeout(()=>{setRound(r=>r>=10?1:r+1);if(!takeNext(tracks))load()},2600)};
+ const snapshot=(t:Track,ok:boolean)=>{const anime=animeOf(t),romaji=romajiOf(t);return{trackName:t.trackName,artistName:t.artistName,romaji,anime,spotify:spotifyUrl(t),youtube:youtubeUrl(t),artwork:t.artworkUrl100,ok}};
+ const reveal=(ok:boolean)=>{if(!current)return;const info=snapshot(current,ok);setRevealInfo(info);if(!ok)setLastSkipped(info);setRevealed(true);setSuggestionsOpen(false);setMessage("");setKind(ok?"good":"bad");setTimeout(()=>{setRound(r=>r>=10?1:r+1);if(!takeNext(tracks))load()},3200)};
  const submit=()=>{if(!current||revealed)return;const q=norm(guess);if(q.length<2){setMessage("Нэрээ бич");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450);return}const picked=selected==null?null:[current,...tracks].find(t=>t.trackId===selected)??null;const ok=guessCorrect(guess,current,picked,selected);if(ok){setScore(s=>s+Math.max(20,100-level*20));setStreak(s=>s+1);reveal(true)}else{setStreak(0);setMessage("Буруу");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450)}};
  const volTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const bumpVolRef=useRef<(d:number)=>void>(()=>{});
@@ -79,8 +84,6 @@ export default function SongGame(){
  bumpVolRef.current=bumpVol;
  const scrubVol=(e:React.PointerEvent<HTMLDivElement>,vertical:boolean)=>{const rect=e.currentTarget.getBoundingClientRect();const raw=vertical?1-(e.clientY-rect.top)/Math.max(rect.height,1):(e.clientX-rect.left)/Math.max(rect.width,1);setVolume(Math.min(1,Math.max(0,Math.round(raw*20)/20)));if(volTimer.current)clearTimeout(volTimer.current);setVolPulse(true);volTimer.current=setTimeout(()=>setVolPulse(false),280)};
  useEffect(()=>{const onWheel=(e:WheelEvent)=>{const el=(e.target as Element|null)?.closest?.(".vol-ctrl");if(!el)return;e.preventDefault();bumpVolRef.current(e.deltaY<0||e.deltaX<0?.05:-.05)};document.addEventListener("wheel",onWheel,{passive:false,capture:true});return()=>document.removeEventListener("wheel",onWheel,true)},[]);
- const animeName=current?animeOf(current):null;
- const romajiName=current?romajiOf(current):null;
  const volCtrl=(vertical:boolean)=>(
   <div className={`vol-ctrl ${vertical?"vert":"horiz"} ${volPulse?"pulse":""}`}>
    <button type="button" className="vol-btn" aria-label="Багасгах" onClick={()=>bumpVol(-.05)}>−</button>
@@ -167,15 +170,42 @@ export default function SongGame(){
 
     {message&&<p className={`message ${kind}`}>{message}</p>}
 
-    {revealed&&current&&(
+    {!revealed&&lastSkipped&&(
+     <div className="prev-skip">
+      <span className="prev-skip-label">Өмнөх skip</span>
+      <p className="prev-skip-title">{lastSkipped.romaji||lastSkipped.trackName}</p>
+      <p className="prev-skip-meta">{lastSkipped.artistName}{lastSkipped.anime?` · ${lastSkipped.anime}`:""}</p>
+      <div className="listen-row compact">
+       <a className="listen spotify" href={lastSkipped.spotify} target="_blank" rel="noopener noreferrer" title="Spotify" aria-label="Spotify">
+        <svg viewBox="0 0 24 24" aria-hidden><path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+       </a>
+       <a className="listen youtube" href={lastSkipped.youtube} target="_blank" rel="noopener noreferrer" title="YouTube" aria-label="YouTube">
+        <svg viewBox="0 0 24 24" aria-hidden><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.5 31.5 0 0 0 0 12a31.5 31.5 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.5 31.5 0 0 0 24 12a31.5 31.5 0 0 0-.5-5.8zM9.8 15.5v-7l6.2 3.5-6.2 3.5z"/></svg>
+       </a>
+      </div>
+     </div>
+    )}
+
+    {revealed&&revealInfo&&(
      <div className="reveal-overlay" role="dialog" aria-modal="true">
       <div className={`reveal ${kind}`}>
-       <small>{kind==="good"?"ЗӨВ":"ХАРИУЛТ"}</small>
-       {current.artworkUrl100&&<img src={current.artworkUrl100.replace("100x100","300x300")} alt=""/>}
-       <strong>{current.trackName}</strong>
-       {romajiName&&romajiName!==current.trackName&&<p className="reveal-romaji">{romajiName}</p>}
-       <span>{current.artistName}</span>
-       {animeName&&<p className={`reveal-anime ${kind!=="good"?"reveal-anime-top":""}`}><span className="reveal-anime-label">Ашигласан anime</span>{animeName}</p>}
+       <small>{revealInfo.ok?"ЗӨВ":"ХАРИУЛТ"}</small>
+       {revealInfo.anime&&<p className="reveal-anime reveal-anime-top"><span className="reveal-anime-label">Anime</span>{revealInfo.anime}</p>}
+       {revealInfo.artwork&&<img src={revealInfo.artwork.replace("100x100","300x300")} alt=""/>}
+       <strong>{revealInfo.trackName}</strong>
+       {revealInfo.romaji&&revealInfo.romaji!==revealInfo.trackName&&<p className="reveal-romaji">{revealInfo.romaji}</p>}
+       <span>{revealInfo.artistName}</span>
+       <div className="listen-row">
+        <a className="listen spotify" href={revealInfo.spotify} target="_blank" rel="noopener noreferrer">
+         <svg viewBox="0 0 24 24" aria-hidden><path fill="currentColor" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+         Spotify
+        </a>
+        <a className="listen youtube" href={revealInfo.youtube} target="_blank" rel="noopener noreferrer">
+         <svg viewBox="0 0 24 24" aria-hidden><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.5 31.5 0 0 0 0 12a31.5 31.5 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.5 31.5 0 0 0 24 12a31.5 31.5 0 0 0-.5-5.8zM9.8 15.5v-7l6.2 3.5-6.2 3.5z"/></svg>
+         YouTube
+        </a>
+       </div>
+       <em>Бүтнээр нь сонсох бол дээр дар</em>
       </div>
      </div>
     )}
