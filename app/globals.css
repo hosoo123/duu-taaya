@@ -490,6 +490,16 @@ da
   font-size: 12px;
   font-weight: 750;
 }
+.reveal-anime-top {
+  margin: 10px 0 0;
+  font-size: 13px;
+  background: linear-gradient(120deg, #3a1828, #24141c);
+  border-color: #6a3850;
+  box-shadow: 0 8px 24px #ff2f5518;
+}
+.reveal.bad .reveal-anime-top {
+  animation: pop .28s cubic-bezier(.2,.9,.25,1.15);
+}
 
 @keyframes in { from { opacity: 0; transform: translateY(8px); } }
 @keyframes fade { from { opacity: 0; } }
