@@ -119,6 +119,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   align-items: center;
   gap: 8px;
   width: 100%;
+  touch-action: none;
 }
 .vol-btn {
   width: 36px;
@@ -134,12 +135,19 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .vol-btn:hover { color: #fff; background: #1c141e; }
 .vol-btn:active { transform: scale(.9); }
 .vol-meter {
-  width: 6px;
-  height: 72px;
+  width: 10px;
+  height: 88px;
   border-radius: 99px;
   background: #1c151f;
   overflow: hidden;
   position: relative;
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+}
+.vol-ctrl.horiz .vol-meter { cursor: ew-resize; }
+.vol-meter:focus-visible {
+  box-shadow: 0 0 0 3px #ff2f5533;
 }
 .vol-meter i {
   position: absolute;
@@ -150,7 +158,8 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   border-radius: inherit;
   background: linear-gradient(180deg, #ff8a9c, var(--accent));
   box-shadow: 0 0 12px var(--glow);
-  transition: height .25s cubic-bezier(.2,.8,.2,1);
+  transition: height .18s cubic-bezier(.2,.8,.2,1);
+  pointer-events: none;
 }
 .vol-pct {
   font-family: var(--font-display);
@@ -607,8 +616,8 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     border: 1px solid var(--line);
   }
   .vol-mobile .vol-meter {
-    width: 72px;
-    height: 6px;
+    width: 96px;
+    height: 10px;
   }
   .vol-mobile .vol-meter i {
     top: 0;
@@ -617,7 +626,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     right: auto;
     width: var(--p);
     height: 100%;
-    transition: width .25s cubic-bezier(.2,.8,.2,1);
+    transition: width .18s cubic-bezier(.2,.8,.2,1);
   }
   .vol-mobile .vol-btn {
     width: 34px;

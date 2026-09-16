@@ -61,9 +61,32 @@ export default function SongGame(){
  const play=(restart=false,requestedLevel=level)=>{const a=audio.current;if(!a||!current)return;if(!restart&&!paused.current&&remaining.current>0){remaining.current=Math.max(0,remaining.current-(performance.now()-started.current));paused.current=true;if(timer.current)clearTimeout(timer.current);stopVisualizer();a.pause();setPlaying(false);return}if(restart){if(timer.current)clearTimeout(timer.current);stopVisualizer();a.pause();paused.current=false;remaining.current=0}if(!paused.current||remaining.current<=0){a.currentTime=cuePoints[current.trackId]??2.5;remaining.current=limits[requestedLevel]*1000}void startVisualizer();a.play().then(()=>{started.current=performance.now();paused.current=false;setPlaying(true);timer.current=setTimeout(finish,remaining.current)}).catch(()=>{setMessage("Тоглож чадсангүй");setKind("bad")})};
  const reveal=(ok:boolean)=>{setRevealed(true);setSuggestionsOpen(false);setMessage("");setKind(ok?"good":"bad");setTimeout(()=>{setRound(r=>r>=10?1:r+1);if(!takeNext(tracks))load()},2600)};
  const submit=()=>{if(!current||revealed)return;const q=norm(guess);if(q.length<2){setMessage("Нэрээ бич");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450);return}const picked=selected==null?null:[current,...tracks].find(t=>t.trackId===selected)??null;const ok=selected===current.trackId||(!!picked&&sameSong(picked,current))||titleHits(guess,current.trackName);if(ok){setScore(s=>s+Math.max(20,100-level*20));setStreak(s=>s+1);reveal(true)}else{setStreak(0);setMessage("Буруу");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450)}};
- const bumpVol=(delta:number)=>{setVolume(v=>Math.min(1,Math.max(0,Math.round((v+delta)*20)/20)));setVolPulse(true);window.setTimeout(()=>setVolPulse(false),280)};
+ const volTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const bumpVolRef=useRef<(d:number)=>void>(()=>{});
+ const bumpVol=(delta:number)=>{setVolume(v=>Math.min(1,Math.max(0,Math.round((v+delta)*20)/20)));if(volTimer.current)clearTimeout(volTimer.current);setVolPulse(true);volTimer.current=setTimeout(()=>setVolPulse(false),280)};
+ bumpVolRef.current=bumpVol;
+ const scrubVol=(e:React.PointerEvent<HTMLDivElement>,vertical:boolean)=>{const rect=e.currentTarget.getBoundingClientRect();const raw=vertical?1-(e.clientY-rect.top)/Math.max(rect.height,1):(e.clientX-rect.left)/Math.max(rect.width,1);setVolume(Math.min(1,Math.max(0,Math.round(raw*20)/20)));if(volTimer.current)clearTimeout(volTimer.current);setVolPulse(true);volTimer.current=setTimeout(()=>setVolPulse(false),280)};
+ useEffect(()=>{const onWheel=(e:WheelEvent)=>{const el=(e.target as Element|null)?.closest?.(".vol-ctrl");if(!el)return;e.preventDefault();bumpVolRef.current(e.deltaY<0||e.deltaX<0?.05:-.05)};document.addEventListener("wheel",onWheel,{passive:false,capture:true});return()=>document.removeEventListener("wheel",onWheel,true)},[]);
  const animeName=current?animeOf(current):null;
- const volCtrl=<div className={`vol-ctrl ${volPulse?"pulse":""}`}><button type="button" className="vol-btn" aria-label="Багасгах" onClick={()=>bumpVol(-.1)}>−</button><div className="vol-meter" aria-hidden><i style={{"--p":`${Math.round(volume*100)}%`} as React.CSSProperties}/></div><button type="button" className="vol-btn" aria-label="Нэмэх" onClick={()=>bumpVol(.1)}>+</button><span className="vol-pct">{Math.round(volume*100)}</span></div>;
+ const volCtrl=(vertical:boolean)=>(
+  <div className={`vol-ctrl ${vertical?"vert":"horiz"} ${volPulse?"pulse":""}`}>
+   <button type="button" className="vol-btn" aria-label="Багасгах" onClick={()=>bumpVol(-.05)}>−</button>
+   <div
+    className="vol-meter"
+    role="slider"
+    tabIndex={0}
+    aria-valuemin={0}
+    aria-valuemax={100}
+    aria-valuenow={Math.round(volume*100)}
+    aria-label="Дууны чанга"
+    onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);scrubVol(e,vertical)}}
+    onPointerMove={e=>{if(e.buttons)scrubVol(e,vertical)}}
+    onKeyDown={e=>{if(e.key==="ArrowUp"||e.key==="ArrowRight"){e.preventDefault();bumpVol(.05)}if(e.key==="ArrowDown"||e.key==="ArrowLeft"){e.preventDefault();bumpVol(-.05)}}}
+   ><i style={{"--p":`${Math.round(volume*100)}%`} as React.CSSProperties}/></div>
+   <button type="button" className="vol-btn" aria-label="Нэмэх" onClick={()=>bumpVol(.05)}>+</button>
+   <span className="vol-pct">{Math.round(volume*100)}</span>
+  </div>
+ );
  return (
   <main className="shell">
    <aside className="rail">
@@ -74,7 +97,7 @@ export default function SongGame(){
      ))}</div>
     </div>
     <button className="reset" onClick={()=>{setScore(0);setStreak(0);setRound(1);load()}} title="Шинээр">↻</button>
-    <div className="vol-rail">{volCtrl}</div>
+    <div className="vol-rail">{volCtrl(true)}</div>
    </aside>
 
    <section className="stage">
@@ -86,7 +109,7 @@ export default function SongGame(){
      <div className="stats"><b>{score}</b><span>оноо</span><i/><b>{streak}</b><span>streak</span><i/><b>{round}/10</b></div>
     </header>
 
-    <div className="vol-mobile">{volCtrl}</div>
+    <div className="vol-mobile">{volCtrl(false)}</div>
 
     <nav className="genres">{visibleGenres(mode).map(g=>(
      <button key={g} className={`chip ${genre===g?"active":""}`} onClick={()=>{setGenre(g);setRound(1)}}>{genreLabel(g)}</button>
