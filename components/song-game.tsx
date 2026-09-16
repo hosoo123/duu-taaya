@@ -11,14 +11,45 @@ const distance=(a:string,b:string)=>{const m=a.length,n=b.length;if(!m)return n;
 const sameSong=(a:Track,b:Track)=>canonicalTitle(a.trackName)===canonicalTitle(b.trackName)&&norm(a.artistName)===norm(b.artistName);
 const titleHits=(guess:string,title:string)=>{const q=canonicalTitle(guess),t=canonicalTitle(title);if(!q||!t)return false;if(q===t)return true;const need=Math.max(5,Math.ceil(t.length*.85));if(q.length<need)return false;const maxDist=t.length<=5?0:t.length<=10?1:t.length<=18?2:3;return distance(q,t)<=maxDist};
 const animeOf=(t:Track)=>animeSources[t.trackId]||animeSourcesByTitle[canonicalTitle(t.trackName)]||null;
+const animeAliases:Record<string,string[]>={
+ "demonslayerkimetsunoyaiba":["demonslayer","kimetsu","kny"],
+ "demonslayermugentrain":["demonslayer","mugentrain","kimetsu"],
+ "tokyoghoul":["tokyoghoul","ghoul"],
+ "swordartonline":["sao","swordart"],
+ "neongenesisevangelion":["evangelion","eva","nge"],
+ "narutoshippuden":["naruto","shippuden"],
+ naruto:["naruto"],
+ attackontitan:["aot","snk","shingeki","titan"],
+ "attackontitanthefinalseason":["aot","snk","finalseason","titan"],
+ "attackontitanseason2":["aot","snk","titan"],
+ "attackontitanseason3":["aot","snk","titan"],
+ jujutsukaisen:["jjk","jujutsu"],
+ "jujutsukaisenseason2":["jjk","jujutsu"],
+ oshinoko:["oshinoko","onk"],
+ chainsawman:["chainsaw","csm"],
+ "mashlemagicandmuscles":["mashle"],
+ dandadan:["dandadan","ddd"],
+ myheroacademia:["mha","boku","heroacademia"],
+ "myheroacademiaseason3":["mha","boku","heroacademia"],
+ fireforce:["fireforce"],
+ onepiece:["onepiece","op"],
+ "onepiecefilmred":["onepiece","filmred"],
+ "fullmetalalchemistbrotherhood":["fma","fmab","fullmetal"],
+ cowboybebop:["bebop","cowboy"],
+ bluelock:["bluelock"],
+ codegeass:["codegeass","geass"],
+ haikyuu:["haikyuu","haikyu"],
+ yourname:["yourname","kiminonawa"],
+};
+const animeHit=(t:Track,q:string)=>{const a=animeOf(t);if(!a||q.length<2)return false;const na=norm(a);if(na.includes(q))return true;const aliases=animeAliases[na]||[];return aliases.some(x=>x.includes(q)||q.includes(x))};
 const shuffle=<T,>(x:T[])=>{const a=[...x];for(let i=a.length-1;i>0;i--){const n=new Uint32Array(1);crypto.getRandomValues(n);const j=n[0]%(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
 const visibleGenres=(mode:Mode)=>genres.filter(g=>mode==="mongolian"?g!=="anime":g!=="traditional");
 const diffLabel:Record<Difficulty,string>={easy:"Easy",medium:"Med",hard:"Hard",expert:"Pro"};
 const genreLabel=(g:Genre)=>g==="all"?"Бүгд":g==="new"?"Шинэ":g==="traditional"?"Зохиол":g==="anime"?"Anime":g==="hiphop"?"Hip-Hop":g==="pop"?"Pop":"Rock";
 export default function SongGame(){
- const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[volume,setVolume]=useState(.75),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false);
+ const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[volume,setVolume]=useState(.75),[volPulse,setVolPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false);
  const audio=useRef<HTMLAudioElement>(null),wave=useRef<HTMLDivElement>(null),searchbox=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),animation=useRef<number|null>(null),audioContext=useRef<AudioContext|null>(null),analyser=useRef<AnalyserNode|null>(null),mediaSource=useRef<MediaElementAudioSourceNode|null>(null),remaining=useRef(0),started=useRef(0),paused=useRef(false),limits=difficultyLimits[difficulty];
- const suggestions=useMemo(()=>{const q=norm(guess);if(q.length<2)return [];const candidates=[...(current?[current]:[]),...tracks].filter(t=>norm(t.trackName).includes(q)||norm(t.artistName).includes(q)||canonicalTitle(t.trackName).includes(q)).sort((a,b)=>Number(edition.test(a.trackName))-Number(edition.test(b.trackName)));const unique=candidates.filter((t,i,a)=>a.findIndex(x=>`${canonicalTitle(x.trackName)}|${norm(x.artistName)}`===`${canonicalTitle(t.trackName)}|${norm(t.artistName)}`)===i);return unique.map(t=>{const artist=norm(t.artistName),title=canonicalTitle(t.trackName);const rank=artist===q?0:artist.startsWith(q)?1:title.startsWith(q)?2:title.includes(q)?3:4;return{t,rank}}).sort((a,b)=>a.rank-b.rank||a.t.artistName.localeCompare(b.t.artistName)).slice(0,8).map(x=>x.t)},[guess,tracks,current]);
+ const suggestions=useMemo(()=>{const q=norm(guess);if(q.length<2)return [];const candidates=[...(current?[current]:[]),...tracks].filter(t=>norm(t.trackName).includes(q)||norm(t.artistName).includes(q)||canonicalTitle(t.trackName).includes(q)||animeHit(t,q)).sort((a,b)=>Number(edition.test(a.trackName))-Number(edition.test(b.trackName)));const unique=candidates.filter((t,i,a)=>a.findIndex(x=>`${canonicalTitle(x.trackName)}|${norm(x.artistName)}`===`${canonicalTitle(t.trackName)}|${norm(t.artistName)}`)===i);return unique.map(t=>{const artist=norm(t.artistName),title=canonicalTitle(t.trackName),anime=norm(animeOf(t)||"");const rank=artist===q?0:title.startsWith(q)?1:anime.includes(q)||animeHit(t,q)?2:artist.startsWith(q)?3:title.includes(q)?4:5;return{t,rank}}).sort((a,b)=>a.rank-b.rank||a.t.artistName.localeCompare(b.t.artistName)).slice(0,8).map(x=>x.t)},[guess,tracks,current]);
  const stopVisualizer=useCallback(()=>{if(animation.current)cancelAnimationFrame(animation.current);animation.current=null;wave.current?.querySelectorAll<HTMLElement>(".bar").forEach(bar=>{bar.style.removeProperty("height");bar.style.removeProperty("opacity")})},[]);
  const startVisualizer=useCallback(async()=>{const a=audio.current,w=wave.current;if(!a||!w)return;try{const AudioContextClass=window.AudioContext||(window as typeof window&{webkitAudioContext:typeof AudioContext}).webkitAudioContext;if(!audioContext.current)audioContext.current=new AudioContextClass();const ctx=audioContext.current;if(ctx.state==="suspended")await ctx.resume();if(!mediaSource.current){mediaSource.current=ctx.createMediaElementSource(a);analyser.current=ctx.createAnalyser();analyser.current.fftSize=128;analyser.current.smoothingTimeConstant=.78;mediaSource.current.connect(analyser.current);analyser.current.connect(ctx.destination)}w.classList.remove("fallback");const bars=[...w.querySelectorAll<HTMLElement>(".bar")],data=new Uint8Array(analyser.current!.frequencyBinCount);const tick=()=>{analyser.current!.getByteFrequencyData(data);bars.forEach((bar,i)=>{const mirrored=i<bars.length/2?bars.length/2-1-i:i-bars.length/2;const bin=Math.min(data.length-1,Math.floor(mirrored*data.length/(bars.length/2)));const power=data[bin]/255;bar.style.height=(10+power*108)+"px";bar.style.opacity=String(.28+power*.72)});animation.current=requestAnimationFrame(tick)};stopVisualizer();tick()}catch{w.classList.add("fallback")}},[stopVisualizer]);
  const finish=useCallback(()=>{if(timer.current)clearTimeout(timer.current);stopVisualizer();remaining.current=0;paused.current=false;audio.current?.pause();setPlaying(false)},[stopVisualizer]);
@@ -30,7 +61,9 @@ export default function SongGame(){
  const play=(restart=false,requestedLevel=level)=>{const a=audio.current;if(!a||!current)return;if(!restart&&!paused.current&&remaining.current>0){remaining.current=Math.max(0,remaining.current-(performance.now()-started.current));paused.current=true;if(timer.current)clearTimeout(timer.current);stopVisualizer();a.pause();setPlaying(false);return}if(restart){if(timer.current)clearTimeout(timer.current);stopVisualizer();a.pause();paused.current=false;remaining.current=0}if(!paused.current||remaining.current<=0){a.currentTime=cuePoints[current.trackId]??2.5;remaining.current=limits[requestedLevel]*1000}void startVisualizer();a.play().then(()=>{started.current=performance.now();paused.current=false;setPlaying(true);timer.current=setTimeout(finish,remaining.current)}).catch(()=>{setMessage("Тоглож чадсангүй");setKind("bad")})};
  const reveal=(ok:boolean)=>{setRevealed(true);setSuggestionsOpen(false);setMessage("");setKind(ok?"good":"bad");setTimeout(()=>{setRound(r=>r>=10?1:r+1);if(!takeNext(tracks))load()},2600)};
  const submit=()=>{if(!current||revealed)return;const q=norm(guess);if(q.length<2){setMessage("Нэрээ бич");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450);return}const picked=selected==null?null:[current,...tracks].find(t=>t.trackId===selected)??null;const ok=selected===current.trackId||(!!picked&&sameSong(picked,current))||titleHits(guess,current.trackName);if(ok){setScore(s=>s+Math.max(20,100-level*20));setStreak(s=>s+1);reveal(true)}else{setStreak(0);setMessage("Буруу");setKind("bad");setShaking(true);setTimeout(()=>setShaking(false),450)}};
+ const bumpVol=(delta:number)=>{setVolume(v=>Math.min(1,Math.max(0,Math.round((v+delta)*20)/20)));setVolPulse(true);window.setTimeout(()=>setVolPulse(false),280)};
  const animeName=current?animeOf(current):null;
+ const volCtrl=<div className={`vol-ctrl ${volPulse?"pulse":""}`}><button type="button" className="vol-btn" aria-label="Багасгах" onClick={()=>bumpVol(-.1)}>−</button><div className="vol-meter" aria-hidden><i style={{"--p":`${Math.round(volume*100)}%`} as React.CSSProperties}/></div><button type="button" className="vol-btn" aria-label="Нэмэх" onClick={()=>bumpVol(.1)}>+</button><span className="vol-pct">{Math.round(volume*100)}</span></div>;
  return (
   <main className="shell">
    <aside className="rail">
@@ -41,7 +74,7 @@ export default function SongGame(){
      ))}</div>
     </div>
     <button className="reset" onClick={()=>{setScore(0);setStreak(0);setRound(1);load()}} title="Шинээр">↻</button>
-    <div className="vol"><input type="range" min="0" max="1" value={volume} step=".05" onChange={e=>setVolume(Number(e.target.value))}/></div>
+    <div className="vol-rail">{volCtrl}</div>
    </aside>
 
    <section className="stage">
@@ -52,6 +85,8 @@ export default function SongGame(){
      </div>
      <div className="stats"><b>{score}</b><span>оноо</span><i/><b>{streak}</b><span>streak</span><i/><b>{round}/10</b></div>
     </header>
+
+    <div className="vol-mobile">{volCtrl}</div>
 
     <nav className="genres">{visibleGenres(mode).map(g=>(
      <button key={g} className={`chip ${genre===g?"active":""}`} onClick={()=>{setGenre(g);setRound(1)}}>{genreLabel(g)}</button>
@@ -71,14 +106,15 @@ export default function SongGame(){
      <div className="searchbox" ref={searchbox}>
       {suggestionsOpen&&suggestions.length>0&&(
        <div className="suggestions">
-        {suggestions.map(t=>(
+        {suggestions.map(t=>{const anime=animeOf(t);return(
          <button type="button" className="suggestion" key={t.trackId} onClick={()=>{setSelected(t.trackId);setGuess(t.trackName);setSuggestionsOpen(false)}}>
-          <b>{t.trackName}</b><span>{t.artistName}</span>
+          <b>{t.trackName}</b>
+          <span>{t.artistName}{anime?` · ${anime}`:""}</span>
          </button>
-        ))}
+        )})}
        </div>
       )}
-      <input value={guess} onFocus={()=>setSuggestionsOpen(true)} onChange={e=>{setGuess(e.target.value);setSelected(null);setSuggestionsOpen(true)}} onKeyDown={e=>e.key==="Enter"&&submit()} autoComplete="off" spellCheck={false} placeholder="Дууны нэр…"/>
+      <input value={guess} onFocus={()=>setSuggestionsOpen(true)} onChange={e=>{setGuess(e.target.value);setSelected(null);setSuggestionsOpen(true)}} onKeyDown={e=>e.key==="Enter"&&submit()} autoComplete="off" spellCheck={false} placeholder="Дуу / anime нэр…"/>
      </div>
      <button className="go" onClick={submit}>Таах</button>
     </div>
@@ -97,7 +133,7 @@ export default function SongGame(){
        {current.artworkUrl100&&<img src={current.artworkUrl100.replace("100x100","300x300")} alt=""/>}
        <strong>{current.trackName}</strong>
        <span>{current.artistName}</span>
-       {animeName&&<p className="reveal-anime">{animeName}</p>}
+       {animeName&&<p className="reveal-anime">Anime · {animeName}</p>}
       </div>
      </div>
     )}
