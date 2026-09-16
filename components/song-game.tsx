@@ -93,7 +93,7 @@ const mergeBoards=(a:BoardEntry[],b:BoardEntry[])=>{
   return [...map.values()].sort((x,y)=>y.score-x.score||y.streak-x.streak||x.at-y.at).slice(0,50);
 };
 export default function SongGame(){
- const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[revealInfo,setRevealInfo]=useState<(SkippedInfo&{artwork?:string;ok:boolean})|null>(null),[lastSkipped,setLastSkipped]=useState<SkippedInfo|null>(null),[volume,setVolume]=useState(.75),[sfxVolume,setSfxVolume]=useState(.7),[volPulse,setVolPulse]=useState(false),[sfxPulse,setSfxPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false),[fireworks,setFireworks]=useState<{id:number;x:number;y:number;hue:number;delay:number}[]>([]),[playerName,setPlayerName]=useState(""),[nameDraft,setNameDraft]=useState(""),[boardOpen,setBoardOpen]=useState(false),[nameOpen,setNameOpen]=useState(false),[board,setBoard]=useState<BoardEntry[]>([]),[boardPersistent,setBoardPersistent]=useState(false),[boardBusy,setBoardBusy]=useState(false),[submitNote,setSubmitNote]=useState("");
+ const [mode,setMode]=useState<Mode>("mongolian"),[genre,setGenre]=useState<Genre>("all"),[difficulty,setDifficulty]=useState<Difficulty>("medium"),[tracks,setTracks]=useState<Track[]>([]),[current,setCurrent]=useState<Track|null>(null),[level,setLevel]=useState(0),[score,setScore]=useState(0),[streak,setStreak]=useState(0),[round,setRound]=useState(1),[loading,setLoading]=useState(true),[playing,setPlaying]=useState(false),[message,setMessage]=useState(""),[kind,setKind]=useState<""|"good"|"bad">(""),[guess,setGuess]=useState(""),[selected,setSelected]=useState<number|null>(null),[revealed,setRevealed]=useState(false),[revealInfo,setRevealInfo]=useState<(SkippedInfo&{artwork?:string;ok:boolean})|null>(null),[lastSkipped,setLastSkipped]=useState<SkippedInfo|null>(null),[volume,setVolume]=useState(.75),[sfxVolume,setSfxVolume]=useState(.7),[volPulse,setVolPulse]=useState(false),[sfxPulse,setSfxPulse]=useState(false),[suggestionsOpen,setSuggestionsOpen]=useState(false),[shaking,setShaking]=useState(false),[fireworks,setFireworks]=useState<{id:number;x:number;y:number;hue:number;delay:number}[]>([]),[playerName,setPlayerName]=useState(""),[nameDraft,setNameDraft]=useState(""),[boardOpen,setBoardOpen]=useState(false),[nameOpen,setNameOpen]=useState(false),[board,setBoard]=useState<BoardEntry[]>([]),[boardBusy,setBoardBusy]=useState(false),[submitNote,setSubmitNote]=useState("");
  const audio=useRef<HTMLAudioElement>(null),wave=useRef<HTMLDivElement>(null),searchbox=useRef<HTMLDivElement>(null),timer=useRef<ReturnType<typeof setTimeout>|null>(null),animation=useRef<number|null>(null),audioContext=useRef<AudioContext|null>(null),sfxContext=useRef<AudioContext|null>(null),analyser=useRef<AnalyserNode|null>(null),mediaSource=useRef<MediaElementAudioSourceNode|null>(null),remaining=useRef(0),started=useRef(0),paused=useRef(false),sfxVolRef=useRef(.7),scoreRef=useRef(0),streakRef=useRef(0),nameRef=useRef(""),limits=difficultyLimits[difficulty];
  useEffect(()=>{scoreRef.current=score},[score]);
  useEffect(()=>{streakRef.current=streak},[streak]);
@@ -113,7 +113,6 @@ export default function SongGame(){
       const merged=mergeBoards(local,remote);
       writeLocalBoard(merged);
       setBoard(merged);
-      setBoardPersistent(Boolean(data.persistent));
     }else setBoard(local);
   }catch{setBoard(readLocalBoard())}
   finally{setBoardBusy(false)}
@@ -135,7 +134,6 @@ export default function SongGame(){
       const merged=mergeBoards(mergedLocal,remote);
       writeLocalBoard(merged);
       setBoard(merged);
-      setBoardPersistent(Boolean(data.persistent));
       setSubmitNote(data.updated?"Leaderboard-д хадгаллаа":"Өмнөх онооноос бага байна");
     }else setSubmitNote("Локал хадгаллаа");
   }catch{setSubmitNote("Локал хадгаллаа")}
@@ -289,7 +287,6 @@ export default function SongGame(){
       <button key={d} className={`diff ${difficulty===d?"active":""}`} onClick={()=>{setDifficulty(d);setLevel(0)}}>{diffLabel[d]}</button>
      ))}</div>
     </div>
-    <button className="board-btn" type="button" onClick={openBoard} title="Leaderboard">🏆</button>
     <button className="name-chip" type="button" onClick={()=>{setNameDraft(playerName);setNameOpen(true)}} title="Нэр солих">{playerName||"Нэр?"}</button>
     <button className="reset" onClick={()=>{setScore(0);setStreak(0);setRound(1);load()}} title="Шинээр">↻</button>
     <div className="vol-rail">
@@ -304,8 +301,10 @@ export default function SongGame(){
       <button className={`pill ${mode==="mongolian"?"on":""}`} onClick={()=>{setMode("mongolian");setGenre("all");setScore(0);setStreak(0);setRound(1)}}>Монгол</button>
       <button className={`pill ${mode==="foreign"?"on":""}`} onClick={()=>{setMode("foreign");setGenre("all");setScore(0);setStreak(0);setRound(1)}}>Гадаад</button>
      </div>
-     <div className="stats"><b>{score}</b><span>оноо</span><i/><b>{streak}</b><span>streak</span><i/><b>{round}/10</b></div>
-     <button className="board-btn mobile" type="button" onClick={openBoard} aria-label="Leaderboard">🏆</button>
+     <div className="hud-right">
+      <div className="stats"><b>{score}</b><span>оноо</span><i/><b>{streak}</b><span>streak</span><i/><b>{round}/10</b></div>
+      <button className="board-btn hud-trophy" type="button" onClick={openBoard} title="Leaderboard" aria-label="Leaderboard">🏆</button>
+     </div>
     </header>
 
     <div className="vol-mobile">
@@ -436,7 +435,7 @@ export default function SongGame(){
         </div>
         <button type="button" className="board-close" onClick={()=>setBoardOpen(false)} aria-label="Хаах">×</button>
        </div>
-       <p className="board-meta">{playerName?`Та: ${playerName} · ${score} оноо`:"Нэрээ оруулна уу"} · {boardPersistent?"PostgreSQL":"offline"}</p>
+       <p className="board-meta">{playerName?`Та: ${playerName} · ${score} оноо`:"Нэрээ оруулна уу"}</p>
        <div className="board-list">
         {boardBusy&&board.length===0&&<p className="board-empty">Ачаалж байна…</p>}
         {!boardBusy&&board.length===0&&<p className="board-empty">Одоогоор хоосон. 10 дуу таагаад оноогоо илгээгээрэй.</p>}
