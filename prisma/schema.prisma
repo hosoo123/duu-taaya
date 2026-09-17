@@ -9,15 +9,19 @@ datasource db {
 }
 
 model LeaderboardScore {
-  id         String   @id @default(cuid())
-  name       String
-  nameKey    String   @unique
-  score      Int
-  streak     Int      @default(0)
-  mode       String   @default("mongolian")
-  difficulty String   @default("medium")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  nameKey     String   @unique
+  score       Int
+  streak      Int      @default(0)
+  mode        String   @default("mongolian")
+  difficulty  String   @default("medium")
+  easyScore   Int      @default(0)
+  mediumScore Int      @default(0)
+  hardScore   Int      @default(0)
+  expertScore Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([score(sort: Desc), streak(sort: Desc)])
 }

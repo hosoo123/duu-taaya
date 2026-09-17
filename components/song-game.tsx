@@ -229,6 +229,20 @@ const shuffle = <T,>(x: T[]) => {
   }
   return a;
 };
+const seededShuffle = <T,>(x: T[], seed: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++)
+    h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  const a = [...x];
+  for (let i = a.length - 1; i > 0; i--) {
+    h ^= h << 13;
+    h ^= h >>> 17;
+    h ^= h << 5;
+    const j = Math.abs(h) % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
 const visibleGenres = (mode: Mode) =>
   genres.filter((g) =>
     mode === "mongolian"
@@ -278,6 +292,10 @@ type BoardEntry = {
   streak: number;
   mode: string;
   difficulty: string;
+  easyScore?: number;
+  mediumScore?: number;
+  hardScore?: number;
+  expertScore?: number;
   at: number;
 };
 type CommentEntry = { id: string; name: string; body: string; at: number };
@@ -288,6 +306,17 @@ const cleanName = (raw: string) =>
     .replace(/[^\p{L}\p{N} _.-]/gu, "")
     .trim()
     .slice(0, 16);
+const diffScores = (e: BoardEntry) => ({
+  easyScore: e.easyScore ?? (e.difficulty === "easy" ? e.score : 0),
+  mediumScore: e.mediumScore ?? (e.difficulty === "medium" ? e.score : 0),
+  hardScore: e.hardScore ?? (e.difficulty === "hard" ? e.score : 0),
+  expertScore: e.expertScore ?? (e.difficulty === "expert" ? e.score : 0),
+});
+const totalScore = (e: BoardEntry) => {
+  const d = diffScores(e);
+  const sum = d.easyScore + d.mediumScore + d.hardScore + d.expertScore;
+  return Math.max(e.score || 0, sum);
+};
 const readLocalBoard = (): BoardEntry[] => {
   try {
     const raw = JSON.parse(localStorage.getItem(LOCAL_BOARD_KEY) || "[]");
@@ -306,12 +335,29 @@ const mergeBoards = (a: BoardEntry[], b: BoardEntry[]) => {
   for (const e of [...a, ...b]) {
     const k = e.name.toLowerCase();
     const prev = map.get(k);
-    if (
-      !prev ||
-      e.score > prev.score ||
-      (e.score === prev.score && e.streak > prev.streak)
-    )
-      map.set(k, e);
+    const nextDiff = diffScores(e);
+    if (!prev) {
+      map.set(k, {
+        ...e,
+        ...nextDiff,
+        score: totalScore({ ...e, ...nextDiff }),
+      });
+      continue;
+    }
+    const prevDiff = diffScores(prev);
+    const merged = {
+      easyScore: Math.max(prevDiff.easyScore, nextDiff.easyScore),
+      mediumScore: Math.max(prevDiff.mediumScore, nextDiff.mediumScore),
+      hardScore: Math.max(prevDiff.hardScore, nextDiff.hardScore),
+      expertScore: Math.max(prevDiff.expertScore, nextDiff.expertScore),
+    };
+    const newer = e.at >= prev.at ? e : prev;
+    map.set(k, {
+      ...newer,
+      ...merged,
+      streak: Math.max(prev.streak, e.streak),
+      score: merged.easyScore + merged.mediumScore + merged.hardScore + merged.expertScore,
+    });
   }
   return [...map.values()]
     .sort((x, y) => y.score - x.score || y.streak - x.streak || x.at - y.at)
@@ -466,6 +512,16 @@ export default function SongGame() {
         }
         return;
       }
+      const diffs = {
+        easyScore: 0,
+        mediumScore: 0,
+        hardScore: 0,
+        expertScore: 0,
+        [`${difficulty}Score`]: points,
+      } as Pick<
+        BoardEntry,
+        "easyScore" | "mediumScore" | "hardScore" | "expertScore"
+      >;
       const localEntry: BoardEntry = {
         id: `local-${norm(name)}`,
         name,
@@ -473,6 +529,7 @@ export default function SongGame() {
         streak: st,
         mode,
         difficulty,
+        ...diffs,
         at: Date.now(),
       };
       const mergedLocal = mergeBoards(readLocalBoard(), [localEntry]);
@@ -754,19 +811,15 @@ export default function SongGame() {
   const suggestions = useMemo(() => {
     const q = norm(guess);
     if (q.length < 2) return [];
-    const candidates = [...(current ? [current] : []), ...tracks]
-      .filter(
-        (t) =>
-          norm(t.trackName).includes(q) ||
-          norm(t.artistName).includes(q) ||
-          canonicalTitle(t.trackName).includes(q) ||
-          animeHit(t, q) ||
-          romajiHitTrack(t, q),
-      )
-      .sort(
-        (a, b) =>
-          Number(edition.test(a.trackName)) - Number(edition.test(b.trackName)),
-      );
+    const pool = [...(current ? [current] : []), ...tracks];
+    const candidates = pool.filter(
+      (t) =>
+        norm(t.trackName).includes(q) ||
+        norm(t.artistName).includes(q) ||
+        canonicalTitle(t.trackName).includes(q) ||
+        animeHit(t, q) ||
+        romajiHitTrack(t, q),
+    );
     const unique = candidates.filter(
       (t, i, a) =>
         a.findIndex(
@@ -775,31 +828,40 @@ export default function SongGame() {
             `${canonicalTitle(t.trackName)}|${norm(t.artistName)}`,
         ) === i,
     );
-    return unique
-      .map((t) => {
-        const artist = norm(t.artistName),
-          title = canonicalTitle(t.trackName),
-          anime = norm(animeOf(t) || "");
-        const rank =
-          artist === q
-            ? 0
-            : title.startsWith(q)
-              ? 1
-              : anime.includes(q) || animeHit(t, q)
-                ? 2
+    const ranked = unique.map((t) => {
+      const artist = norm(t.artistName),
+        title = canonicalTitle(t.trackName),
+        anime = norm(animeOf(t) || "");
+      const editionPenalty = edition.test(t.trackName) ? 10 : 0;
+      const rank =
+        (title.startsWith(q)
+          ? 0
+          : title.includes(q)
+            ? 1
+            : anime.includes(q) || animeHit(t, q)
+              ? 2
+              : artist === q
+                ? 3
                 : artist.startsWith(q)
-                  ? 3
-                  : title.includes(q)
-                    ? 4
-                    : 5;
-        return { t, rank };
-      })
-      .sort(
-        (a, b) =>
-          a.rank - b.rank || a.t.artistName.localeCompare(b.t.artistName),
+                  ? 4
+                  : artist.includes(q)
+                    ? 5
+                    : 6) + editionPenalty;
+      return { t, rank };
+    });
+    const groups = new Map<number, Track[]>();
+    for (const row of ranked) {
+      const list = groups.get(row.rank) || [];
+      list.push(row.t);
+      groups.set(row.rank, list);
+    }
+    const seed = `${q}|${current?.trackId ?? ""}`;
+    return [...groups.keys()]
+      .sort((a, b) => a - b)
+      .flatMap((rank) =>
+        seededShuffle(groups.get(rank) || [], `${seed}|${rank}`),
       )
-      .slice(0, 8)
-      .map((x) => x.t);
+      .slice(0, 8);
   }, [guess, tracks, current]);
   const startVisualizer = useCallback(async () => {
     const a = audio.current,
@@ -1106,6 +1168,8 @@ export default function SongGame() {
       if (endOfSet) {
         void submitScore(false);
         setBoardOpen(true);
+        setScore(0);
+        setStreak(0);
       }
       setRound((r) => (r >= 10 ? 1 : r + 1));
       if (!takeNext(tracks)) load();
@@ -1128,7 +1192,16 @@ export default function SongGame() {
         : ([current, ...tracks].find((t) => t.trackId === selected) ?? null);
     const ok = guessCorrect(guess, current, picked, selected);
     if (ok) {
-      setScore((s) => s + Math.max(20, 100 - level * 20));
+      const base = Math.max(20, 100 - level * 20);
+      const mult =
+        difficulty === "easy"
+          ? 0.6
+          : difficulty === "medium"
+            ? 1
+            : difficulty === "hard"
+              ? 1.6
+              : 2.2;
+      setScore((s) => s + Math.round(base * mult));
       setStreak((s) => s + 1);
       reveal(true);
     } else {
@@ -1700,16 +1773,38 @@ export default function SongGame() {
                     Одоогоор хоосон. 10 дуу таагаад оноогоо илгээгээрэй.
                   </p>
                 )}
-                {board.map((e, i) => (
-                  <div
-                    key={e.id || `${e.name}-${i}`}
-                    className={`board-row ${playerName && e.name.toLowerCase() === playerName.toLowerCase() ? "me" : ""}`}
-                  >
-                    <span className="board-rank">{i + 1}</span>
-                    <span className="board-name">{e.name}</span>
-                    <span className="board-score">{e.score}</span>
-                  </div>
-                ))}
+                {board.map((e, i) => {
+                  const d = diffScores(e);
+                  const parts = (
+                    [
+                      ["Easy", d.easyScore],
+                      ["Med", d.mediumScore],
+                      ["Hard", d.hardScore],
+                      ["Xprt", d.expertScore],
+                    ] as const
+                  ).filter(([, n]) => n > 0);
+                  return (
+                    <div
+                      key={e.id || `${e.name}-${i}`}
+                      className={`board-row ${playerName && e.name.toLowerCase() === playerName.toLowerCase() ? "me" : ""}`}
+                    >
+                      <span className="board-rank">{i + 1}</span>
+                      <div className="board-main">
+                        <span className="board-name">{e.name}</span>
+                        {parts.length > 0 && (
+                          <span className="board-diffs">
+                            {parts.map(([label, n]) => (
+                              <span key={label}>
+                                {label} {n}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </div>
+                      <span className="board-score">{e.score}</span>
+                    </div>
+                  );
+                })}
               </div>
               {submitNote && <p className="board-note">{submitNote}</p>}
               <div className="board-actions">
