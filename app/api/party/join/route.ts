@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
       if (!room) return { error: "not found" as const };
       if (room.expiresAt.getTime() < Date.now())
         return { error: "expired" as const };
-      if (room.status !== "lobby") return { error: "started" as const };
 
+      // Refresh/reconnect: тоглолт эхэлсэн ч байсан тоглогч буцаж орно
       const existing = room.players.find((p) => p.nameKey === nameKey);
       if (existing) {
         const fresh = await client.partyRoom.findUnique({
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
         });
         return { room: fresh! };
       }
+      if (room.status !== "lobby") return { error: "started" as const };
       if (room.players.length >= room.maxPlayers)
         return { error: "full" as const };
 

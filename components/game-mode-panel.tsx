@@ -29,6 +29,7 @@ type Props = {
   onLeave: () => void;
   hotSeatNames: string[];
   hotSeatTurn: number;
+  hotSeatScores?: Record<string, number>;
   onHotSeatSetup: (names: string[]) => void;
   onHotSeatExit: () => void;
 };
@@ -93,6 +94,7 @@ export function GameModePanel({
   onLeave,
   hotSeatNames,
   hotSeatTurn,
+  hotSeatScores = {},
   onHotSeatSetup,
   onHotSeatExit,
 }: Props) {
@@ -180,6 +182,20 @@ export function GameModePanel({
                 </span>
               </div>
             </div>
+            {room.status === "finished" && room.players[0] && (
+              <p className="board-meta gm-winner">
+                Ялагч: <b>{room.players[0].name}</b> · {room.players[0].score}{" "}
+                оноо
+              </p>
+            )}
+            {room.kind === "streak" && room.status === "playing" && (
+              <p className="board-meta">
+                Shared streak · одоогийн хамгийн өндөр:{" "}
+                <b>
+                  {Math.max(0, ...room.players.map((p) => p.streak))}
+                </b>
+              </p>
+            )}
             <div className="board-list gm-list">
               {room.players.map((p, i) => (
                 <div
@@ -219,14 +235,25 @@ export function GameModePanel({
                   type="button"
                   className="go"
                   onClick={onStartParty}
-                  disabled={busy || room.playerCount < 1}
+                  disabled={
+                    busy ||
+                    room.playerCount < (room.kind === "duel" ? 2 : 1)
+                  }
                 >
                   Эхлэх
+                  {room.kind === "duel" && room.playerCount < 2
+                    ? " (2 хүн)"
+                    : ""}
                 </button>
               )}
-              {room.status !== "lobby" && (
+              {room.status === "playing" && (
                 <button type="button" className="go" onClick={onClose}>
                   Тоглох
+                </button>
+              )}
+              {room.status === "finished" && (
+                <button type="button" className="go" onClick={onClose}>
+                  Хаах
                 </button>
               )}
               <button type="button" className="ghost" onClick={onLeave}>
@@ -243,15 +270,25 @@ export function GameModePanel({
               </b>
             </p>
             <div className="board-list gm-list">
-              {hotSeatNames.map((n, i) => (
-                <div
-                  key={`${n}-${i}`}
-                  className={`board-row ${i === hotSeatTurn % hotSeatNames.length ? "me" : ""}`}
-                >
-                  <span className="board-rank">{i + 1}</span>
-                  <span className="board-name">{n}</span>
-                </div>
-              ))}
+              {[...hotSeatNames]
+                .map((n, i) => ({
+                  name: n,
+                  score: hotSeatScores[n] || 0,
+                  idx: i,
+                }))
+                .sort((a, b) => b.score - a.score || a.idx - b.idx)
+                .map((row, i) => (
+                  <div
+                    key={`${row.name}-${row.idx}`}
+                    className={`board-row ${
+                      row.idx === hotSeatTurn % hotSeatNames.length ? "me" : ""
+                    }`}
+                  >
+                    <span className="board-rank">{i + 1}</span>
+                    <span className="board-name">{row.name}</span>
+                    <span className="board-score">{row.score}</span>
+                  </div>
+                ))}
             </div>
             <div className="board-actions gm-actions">
               <button type="button" className="go" onClick={onClose}>

@@ -729,6 +729,10 @@ export default function SongGame() {
     partyCodeRef.current = info.code;
     setParty(info);
     const soft = !!opts?.soft;
+    const meName = (nameRef.current || "").toLowerCase();
+    const me = meName
+      ? info.players.find((p) => p.name.toLowerCase() === meName)
+      : undefined;
     if (!soft) {
       setMode(info.mode === "foreign" ? "foreign" : "mongolian");
       if (
@@ -739,7 +743,8 @@ export default function SongGame() {
       )
         setDifficulty(info.difficulty);
     }
-    if (info.status !== "lobby" && info.trackIds.length >= 8) {
+    // Зөвхөн гишүүнд track lock — зочин mid-game soft poll-оор lock хийхгүй
+    if (info.status !== "lobby" && info.trackIds.length >= 8 && me) {
       setLockedTrackIds((prev) => {
         if (
           prev &&
@@ -749,15 +754,14 @@ export default function SongGame() {
           return prev;
         return info.trackIds;
       });
+      // Анхны lock үед (soft/hard) progress сэргээнэ — soft poll дахин reset хийхгүй
       if (!partyAppliedRef.current) {
         partyAppliedRef.current = true;
-        const meName = (nameRef.current || "").toLowerCase();
-        const me = info.players.find((p) => p.name.toLowerCase() === meName);
-        const done = Math.max(0, Math.min(10, me?.roundsDone || 0));
+        const done = Math.max(0, Math.min(10, me.roundsDone || 0));
         partyResumeRef.current = done;
-        setScore(me?.score || 0);
-        setStreak(me?.streak || 0);
-        setRound(done >= 10 ? 10 : done + 1);
+        setScore(me.score || 0);
+        setStreak(me.streak || 0);
+        setRound(done >= 10 ? 10 : Math.max(1, done + 1));
         setPlayedRef.current = info.trackIds.slice(0, done);
       }
     }
@@ -871,11 +875,17 @@ export default function SongGame() {
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.room) {
           partyAppliedRef.current = false;
-          applyParty(data.room as PartyRoomInfo);
-          setPartyNote("Room-д орлоо");
+          const room = data.room as PartyRoomInfo;
+          applyParty(room);
+          if (room.status === "playing") {
+            setGameModeOpen(false);
+            setPartyNote("Үргэлжлүүллээ");
+          } else setPartyNote("Room-д орлоо");
         } else if (data.error === "full") setPartyNote("Room дүүрсэн");
         else if (data.error === "started")
-          setPartyNote("Тоглолт эхэлсэн — оройтсон");
+          setPartyNote("Тоглолт эхэлсэн — зөвхөн гишүүд орно");
+        else if (data.error === "expired")
+          setPartyNote("Room хугацаа дууссан");
         else setPartyNote("Room олдсонгүй");
       } catch {
         setPartyNote("Орж чадсангүй");
@@ -1404,11 +1414,8 @@ export default function SongGame() {
   );
   const load = useCallback(async () => {
     if (!bootReady) return;
-    if (lockedTrackIds?.length === 10) {
-      await loadByTrackIds(
-        lockedTrackIds,
-        mode,
-      );
+    if (lockedTrackIds && lockedTrackIds.length >= 8) {
+      await loadByTrackIds(lockedTrackIds, mode);
       return;
     }
     setLoading(true);
@@ -1536,9 +1543,13 @@ export default function SongGame() {
                     ? "Нэвтэрээд room-д орно уу"
                     : "Room lobby — нэвтэрээд нэгд",
                 );
+              } else if (info.status === "finished") {
+                setGameModeOpen(true);
+                setPartyNote("Энэ room дууссан");
               } else {
-                setGameModeOpen(false);
-                setPartyNote("");
+                // Playing: panel нээлттэй үлдээнэ — auth/join дуустал
+                setGameModeOpen(true);
+                setPartyNote("Тоглолт явж байна — нэвтэрээд үргэлжлүүлнэ");
               }
             }
           } else if (!cancelled) {
@@ -1565,14 +1576,19 @@ export default function SongGame() {
       (p) => p.name.toLowerCase() === name.toLowerCase(),
     );
     if (alreadyIn) {
-      // Refresh: аль хэдийн тоглогч — track lock дахин баталгаажуулна
-      if (party && party.status !== "lobby" && !lockedTrackIds?.length) {
+      // Нэр хожуу ирвэл / track lock алдагдвал resume дахин хийнэ
+      if (
+        party &&
+        party.status !== "lobby" &&
+        (!partyAppliedRef.current || !lockedTrackIds?.length)
+      ) {
         partyAppliedRef.current = false;
         applyParty(party);
+        if (party.status === "playing") setGameModeOpen(false);
       }
       return;
     }
-    if (party && party.status !== "lobby") return;
+    if (party?.status === "finished") return;
     const attemptKey = `${code}|${name.toLowerCase()}`;
     if (partyJoinAttemptRef.current === attemptKey) return;
     partyJoinAttemptRef.current = attemptKey;
@@ -1722,6 +1738,7 @@ export default function SongGame() {
         );
     });
     const endOfSet = round >= 10;
+    const inParty = !!partyCodeRef.current;
     setTimeout(() => {
       if (hotSeatNames.length > 0) {
         const name = hotSeatNames[hotSeatTurn % hotSeatNames.length];
@@ -1747,33 +1764,36 @@ export default function SongGame() {
         setMessage(`${nextName}-ийн ээлж`);
         setKind("");
       }
+      const completed = setPlayedRef.current.length;
       if (partyCodeRef.current) {
         void submitPartyScore(
           scoreRef.current,
           streakRef.current,
-          setPlayedRef.current.length,
+          endOfSet ? 10 : completed,
         );
       }
       if (endOfSet) {
         lastSetIdsRef.current = [...setPlayedRef.current];
         lastSetScoreRef.current = scoreRef.current;
         lastSetStreakRef.current = streakRef.current;
-        if (partyCodeRef.current) {
-          void submitPartyScore(
-            scoreRef.current,
-            streakRef.current,
-            10,
-          );
+        if (inParty) {
           setGameModeOpen(true);
+          setPartyNote("10/10 дууссан — оноогоо харна уу");
+          setBoardOpen(false);
+          setRound(10);
+          return;
         }
         void submitScore(false);
         setBoardOpen(true);
         setScore(0);
         setStreak(0);
         setPlayedRef.current = [];
+        setRound(1);
+        if (!takeNext(tracks)) void load();
+        return;
       }
-      setRound((r) => (r >= 10 ? 1 : r + 1));
-      if (!takeNext(tracks)) load();
+      setRound((r) => r + 1);
+      if (!takeNext(tracks)) void load();
     }, 3800);
   };
   const submit = () => {
@@ -2559,6 +2579,7 @@ export default function SongGame() {
           onLeave={leaveParty}
           hotSeatNames={hotSeatNames}
           hotSeatTurn={hotSeatTurn}
+          hotSeatScores={hotSeatScores}
           onHotSeatSetup={setupHotSeat}
           onHotSeatExit={exitHotSeat}
         />

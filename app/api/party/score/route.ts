@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
         where: { id: player.id },
         data: {
           score: Math.max(player.score, score),
-          streak: Math.max(player.streak, streak),
+          // streak буурч болно (буруу хариулт)
+          streak,
           roundsDone: Math.max(player.roundsDone, roundsDone),
         },
       });
