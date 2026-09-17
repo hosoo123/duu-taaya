@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -19,4 +20,13 @@ model LeaderboardScore {
   updatedAt  DateTime @updatedAt
 
   @@index([score(sort: Desc), streak(sort: Desc)])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  name      String
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
 }

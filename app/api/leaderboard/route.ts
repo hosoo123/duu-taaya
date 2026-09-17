@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from "next/server";
-import {prisma} from "@/lib/prisma";
+import {db} from "@/lib/prisma";
 
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
@@ -25,10 +25,10 @@ function toEntry(row:{id:string;name:string;score:number;streak:number;mode:stri
 }
 
 async function listScores(){
-  const rows=await prisma.leaderboardScore.findMany({
+  const rows=await db(client=>client.leaderboardScore.findMany({
     orderBy:[{score:"desc"},{streak:"desc"},{updatedAt:"asc"}],
     take:MAX,
-  });
+  }));
   return rows.map(toEntry);
 }
 
@@ -60,33 +60,26 @@ export async function POST(req:NextRequest){
 
   const nameKey=name.toLowerCase();
   try{
-    const existing=await prisma.leaderboardScore.findUnique({where:{nameKey}});
-    if(existing&&score<=existing.score){
-      const scores=await listScores();
-      return NextResponse.json({scores,updated:false,persistent:true});
-    }
-
-    await prisma.leaderboardScore.upsert({
-      where:{nameKey},
-      create:{
-        name,
-        nameKey,
-        score,
-        streak,
-        mode,
-        difficulty,
-      },
-      update:{
-        name,
-        score,
-        streak:Math.max(streak,existing?.streak||0),
-        mode,
-        difficulty,
-      },
+    const result=await db(async client=>{
+      const existing=await client.leaderboardScore.findUnique({where:{nameKey}});
+      if(existing&&score<=existing.score){
+        return{updated:false as const};
+      }
+      await client.leaderboardScore.upsert({
+        where:{nameKey},
+        create:{name,nameKey,score,streak,mode,difficulty},
+        update:{
+          name,
+          score,
+          streak:Math.max(streak,existing?.streak||0),
+          mode,
+          difficulty,
+        },
+      });
+      return{updated:true as const};
     });
-
     const scores=await listScores();
-    return NextResponse.json({scores,updated:true,persistent:true});
+    return NextResponse.json({scores,updated:result.updated,persistent:true});
   }catch(err){
     console.error("leaderboard POST",err);
     return NextResponse.json({error:"db"},{status:503});
