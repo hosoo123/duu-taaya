@@ -377,12 +377,19 @@ const cleanName = (raw: string) =>
     .trim()
     .slice(0, 16);
 const pickSetIds = (pool: Track[], mode: Mode) => {
-  const fromPool = [...new Set(pool.map((t) => t.trackId))];
+  const fromPool = [
+    ...new Set(
+      pool.filter((t) => t.previewUrl).map((t) => t.trackId),
+    ),
+  ];
   if (fromPool.length >= 10) return shuffle(fromPool).slice(0, 10);
   const featured =
     mode === "mongolian" ? mongolianFeatured : foreignFeatured;
   const ids = [...new Set(Object.values(featured).flat())];
-  return shuffle(ids).slice(0, 10);
+  return shuffle([...fromPool, ...ids.filter((id) => !fromPool.includes(id))]).slice(
+    0,
+    10,
+  );
 };
 const diffScores = (e: BoardEntry) => ({
   easyScore: e.easyScore ?? (e.difficulty === "easy" ? e.score : 0),
@@ -713,19 +720,30 @@ export default function SongGame() {
     if (typeof window === "undefined") return `/?p=${code}`;
     return `${window.location.origin}${window.location.pathname}?p=${code}`;
   };
-  const applyParty = useCallback((info: PartyRoomInfo) => {
+  const applyParty = useCallback((info: PartyRoomInfo, opts?: { soft?: boolean }) => {
     partyCodeRef.current = info.code;
     setParty(info);
-    setMode(info.mode === "foreign" ? "foreign" : "mongolian");
-    if (
-      info.difficulty === "easy" ||
-      info.difficulty === "medium" ||
-      info.difficulty === "hard" ||
-      info.difficulty === "expert"
-    )
-      setDifficulty(info.difficulty);
+    const soft = !!opts?.soft;
+    if (!soft) {
+      setMode(info.mode === "foreign" ? "foreign" : "mongolian");
+      if (
+        info.difficulty === "easy" ||
+        info.difficulty === "medium" ||
+        info.difficulty === "hard" ||
+        info.difficulty === "expert"
+      )
+        setDifficulty(info.difficulty);
+    }
     if (info.status !== "lobby" && info.trackIds.length === 10) {
-      setLockedTrackIds(info.trackIds);
+      setLockedTrackIds((prev) => {
+        if (
+          prev &&
+          prev.length === info.trackIds.length &&
+          prev.every((id, i) => id === info.trackIds[i])
+        )
+          return prev;
+        return info.trackIds;
+      });
       if (!partyAppliedRef.current) {
         partyAppliedRef.current = true;
         setScore(0);
@@ -734,12 +752,14 @@ export default function SongGame() {
         setPlayedRef.current = [];
       }
     }
-    try {
-      const url = new URL(window.location.href);
-      url.searchParams.set("p", info.code);
-      url.searchParams.delete("c");
-      window.history.replaceState({}, "", url.toString());
-    } catch {}
+    if (!soft) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set("p", info.code);
+        url.searchParams.delete("c");
+        window.history.replaceState({}, "", url.toString());
+      } catch {}
+    }
   }, []);
   const refreshParty = useCallback(async (code?: string) => {
     const c = (code || partyCodeRef.current || "").toUpperCase();
@@ -751,7 +771,7 @@ export default function SongGame() {
       if (!res.ok) return null;
       const data = await res.json();
       const info = data.room as PartyRoomInfo;
-      applyParty(info);
+      applyParty(info, { soft: true });
       return info;
     } catch {
       return null;
@@ -852,9 +872,13 @@ export default function SongGame() {
     const name = nameRef.current || playerName;
     const code = partyCodeRef.current;
     if (!code || !name) return;
+    if (tracks.filter((t) => t.previewUrl).length < 10) {
+      setPartyNote("Дуунууд ачаалагдаж дуусахыг хүлээгээд дахин Эхлэх дар");
+      return;
+    }
     const ids = pickSetIds(tracks, mode);
     if (ids.length !== 10) {
-      setPartyNote("Дууны сан ачаалагдаагүй — түр хүлээгээд дахин оролд");
+      setPartyNote("Дууны сан хүрэлцэхгүй байна");
       return;
     }
     setPartyBusy(true);
@@ -1328,11 +1352,11 @@ export default function SongGame() {
             byId.set(x.trackId, x);
         }
         const list = ids.map((id) => byId.get(id)).filter(Boolean) as Track[];
-        if (list.length < 10) throw Error("short");
+        if (list.length < 8) throw Error("short");
         setPlayedRef.current = [];
         if (!takeNext(list)) throw Error();
       } catch {
-        setMessage("Сорилын дуу ачаалж чадсангүй");
+        setMessage("Party дуу ачаалж чадсангүй");
         setKind("bad");
       } finally {
         setLoading(false);
