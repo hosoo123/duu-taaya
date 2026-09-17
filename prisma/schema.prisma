@@ -34,3 +34,32 @@ model Comment {
 
   @@index([createdAt(sort: Desc)])
 }
+
+model Challenge {
+  id         String            @id @default(cuid())
+  code       String            @unique
+  mode       String
+  difficulty String
+  trackIds   Int[]
+  hostName   String
+  createdAt  DateTime          @default(now())
+  expiresAt  DateTime
+  results    ChallengeResult[]
+
+  @@index([createdAt(sort: Desc)])
+}
+
+model ChallengeResult {
+  id          String    @id @default(cuid())
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  name        String
+  nameKey     String
+  score       Int
+  streak      Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([challengeId, nameKey])
+  @@index([challengeId, score(sort: Desc)])
+}

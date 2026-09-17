@@ -42,6 +42,8 @@ const instrumental =
   /\b(instrumental|karaoke|backing track|minus one|no vocals?|vocal off|off vocal|beat only)\b|зөвхөн ая|ая хувилбар/i;
 const edition =
   /\b(remaster(?:ed)?|live|remix|acoustic|instrumental|karaoke|radio edit|sped up|slowed|version|edit)\b/i;
+const featMark =
+  /\b(ft\.?|feat\.?|featuring)\b/i;
 const norm = (s: string) =>
   (s || "")
     .toLowerCase()
@@ -58,8 +60,22 @@ const canonicalTitle = (s: string) =>
       .replace(
         /\s*[-–—]\s*(?:remaster(?:ed)?|live|remix|acoustic|instrumental|karaoke|radio edit|sped up|slowed|version|edit|tv\s*size).*$/i,
         "",
-      ),
+      )
+      .replace(
+        /\s*[\[(][^)\]]*(?:ft\.?|feat\.?|featuring)[^)\]]*[\])]/gi,
+        "",
+      )
+      .replace(
+        /\s*(?:ft\.?|feat\.?|featuring)\s+.+$/i,
+        "",
+      )
+      .trim(),
   );
+const titleCleaner = (t: Track) => {
+  const feat = featMark.test(t.trackName) ? 1 : 0;
+  const ed = edition.test(t.trackName) ? 1 : 0;
+  return feat * 2 + ed + t.trackName.length / 1000;
+};
 const distance = (a: string, b: string) => {
   const m = a.length,
     n = b.length;
@@ -299,6 +315,26 @@ type BoardEntry = {
   at: number;
 };
 type CommentEntry = { id: string; name: string; body: string; at: number };
+type ChallengeResult = {
+  id: string;
+  name: string;
+  score: number;
+  streak: number;
+  at: number;
+};
+type ChallengeInfo = {
+  code: string;
+  mode: string;
+  difficulty: string;
+  trackIds: number[];
+  hostName: string;
+  createdAt: number;
+  expiresAt: number;
+  playerCount: number;
+  maxPlayers: number;
+  full: boolean;
+  results: ChallengeResult[];
+};
 const LOCAL_BOARD_KEY = "duuTaayaBoard";
 const NAME_KEY = "duuTaayaName";
 const cleanName = (raw: string) =>
@@ -412,7 +448,15 @@ export default function SongGame() {
     [comments, setComments] = useState<CommentEntry[]>([]),
     [commentDraft, setCommentDraft] = useState(""),
     [commentsBusy, setCommentsBusy] = useState(false),
-    [commentNote, setCommentNote] = useState("");
+    [commentNote, setCommentNote] = useState(""),
+    [challengeReady, setChallengeReady] = useState(false),
+    [challenge, setChallenge] = useState<ChallengeInfo | null>(null),
+    [lockedTrackIds, setLockedTrackIds] = useState<number[] | null>(null),
+    [challengeOpen, setChallengeOpen] = useState(false),
+    [challengeBusy, setChallengeBusy] = useState(false),
+    [challengeNote, setChallengeNote] = useState(""),
+    [inviteCopied, setInviteCopied] = useState(false),
+    [lastSetReady, setLastSetReady] = useState(false);
   const audio = useRef<HTMLAudioElement>(null),
     wave = useRef<HTMLDivElement>(null),
     searchbox = useRef<HTMLDivElement>(null),
@@ -430,6 +474,11 @@ export default function SongGame() {
     scoreRef = useRef(0),
     streakRef = useRef(0),
     nameRef = useRef(""),
+    setPlayedRef = useRef<number[]>([]),
+    lastSetIdsRef = useRef<number[]>([]),
+    lastSetScoreRef = useRef(0),
+    lastSetStreakRef = useRef(0),
+    challengeCodeRef = useRef<string | null>(null),
     limits = difficultyLimits[difficulty];
   useEffect(() => {
     scoreRef.current = score;
@@ -572,6 +621,123 @@ export default function SongGame() {
     setSubmitNote("");
     void refreshBoard();
   };
+  const inviteUrl = (code: string) => {
+    if (typeof window === "undefined") return `/?c=${code}`;
+    return `${window.location.origin}${window.location.pathname}?c=${code}`;
+  };
+  const applyChallenge = useCallback((info: ChallengeInfo) => {
+    challengeCodeRef.current = info.code;
+    setChallenge(info);
+    setMode(info.mode === "foreign" ? "foreign" : "mongolian");
+    if (
+      info.difficulty === "easy" ||
+      info.difficulty === "medium" ||
+      info.difficulty === "hard" ||
+      info.difficulty === "expert"
+    )
+      setDifficulty(info.difficulty);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("c", info.code);
+      window.history.replaceState({}, "", url.toString());
+    } catch {}
+  }, []);
+  const refreshChallenge = useCallback(async (code?: string) => {
+    const c = (code || challengeCodeRef.current || "").toUpperCase();
+    if (!c) return null;
+    try {
+      const res = await fetch(`/api/challenge?code=${encodeURIComponent(c)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const info = data.challenge as ChallengeInfo;
+      setChallenge(info);
+      challengeCodeRef.current = info.code;
+      return info;
+    } catch {
+      return null;
+    }
+  }, []);
+  const submitChallengeResult = useCallback(
+    async (points: number, st: number) => {
+      const code = challengeCodeRef.current;
+      const name = nameRef.current || playerName;
+      if (!code || !name || points < 1) return;
+      try {
+        const res = await fetch("/api/challenge/result", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, name, score: points, streak: st }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.challenge) {
+          setChallenge(data.challenge as ChallengeInfo);
+          setChallengeNote(
+            data.updated
+              ? "Сорилд оноо хадгаллаа"
+              : "Өмнөх сорилын онооноос бага",
+          );
+        } else if (data.error === "full") {
+          setChallengeNote("Сорил дүүрсэн (5/5)");
+        }
+      } catch {}
+    },
+    [playerName],
+  );
+  const createChallenge = useCallback(async () => {
+    const name = nameRef.current || playerName;
+    const ids = lastSetIdsRef.current;
+    const points = lastSetScoreRef.current;
+    const st = lastSetStreakRef.current;
+    if (!name || name.length < 2) {
+      setNameOpen(true);
+      setChallengeNote("Эхлээд нэрээ оруул");
+      return;
+    }
+    if (ids.length !== 10) {
+      setChallengeNote("Эхлээд 10 дуу таагаарай");
+      return;
+    }
+    setChallengeBusy(true);
+    setChallengeNote("");
+    try {
+      const res = await fetch("/api/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hostName: name,
+          mode,
+          difficulty,
+          trackIds: ids,
+          score: points,
+          streak: st,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.challenge) {
+        applyChallenge(data.challenge as ChallengeInfo);
+        setChallengeOpen(true);
+        setChallengeNote("Сорил үүслээ — link хуул");
+        setBoardOpen(false);
+      } else setChallengeNote("Сорил үүсгэж чадсангүй");
+    } catch {
+      setChallengeNote("Сорил үүсгэж чадсангүй");
+    } finally {
+      setChallengeBusy(false);
+    }
+  }, [playerName, mode, difficulty, applyChallenge]);
+  const copyInvite = useCallback(async () => {
+    const code = challenge?.code;
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl(code));
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 1600);
+    } catch {
+      setChallengeNote(inviteUrl(code));
+    }
+  }, [challenge]);
   const refreshComments = useCallback(async () => {
     setCommentsBusy(true);
     try {
@@ -820,19 +986,20 @@ export default function SongGame() {
         animeHit(t, q) ||
         romajiHitTrack(t, q),
     );
-    const unique = candidates.filter(
-      (t, i, a) =>
-        a.findIndex(
-          (x) =>
-            `${canonicalTitle(x.trackName)}|${norm(x.artistName)}` ===
-            `${canonicalTitle(t.trackName)}|${norm(t.artistName)}`,
-        ) === i,
-    );
+    const byKey = new Map<string, Track>();
+    for (const t of candidates) {
+      const key = `${canonicalTitle(t.trackName)}|${norm(t.artistName)}`;
+      const prev = byKey.get(key);
+      if (!prev || titleCleaner(t) < titleCleaner(prev)) byKey.set(key, t);
+    }
+    const unique = [...byKey.values()];
     const ranked = unique.map((t) => {
       const artist = norm(t.artistName),
         title = canonicalTitle(t.trackName),
         anime = norm(animeOf(t) || "");
-      const editionPenalty = edition.test(t.trackName) ? 10 : 0;
+      const penalty =
+        (edition.test(t.trackName) ? 10 : 0) +
+        (featMark.test(t.trackName) ? 8 : 0);
       const rank =
         (title.startsWith(q)
           ? 0
@@ -846,7 +1013,7 @@ export default function SongGame() {
                   ? 4
                   : artist.includes(q)
                     ? 5
-                    : 6) + editionPenalty;
+                    : 6) + penalty;
       return { t, rank };
     });
     const groups = new Map<number, Track[]>();
@@ -856,12 +1023,27 @@ export default function SongGame() {
       groups.set(row.rank, list);
     }
     const seed = `${q}|${current?.trackId ?? ""}`;
-    return [...groups.keys()]
+    let out = [...groups.keys()]
       .sort((a, b) => a - b)
       .flatMap((rank) =>
         seededShuffle(groups.get(rank) || [], `${seed}|${rank}`),
-      )
-      .slice(0, 8);
+      );
+    const MIN = 5;
+    if (out.length < MIN && pool.length > out.length) {
+      const seen = new Set(
+        out.map((t) => `${canonicalTitle(t.trackName)}|${norm(t.artistName)}`),
+      );
+      const decoys: Track[] = [];
+      for (const t of seededShuffle(pool, `${seed}|decoy`)) {
+        const key = `${canonicalTitle(t.trackName)}|${norm(t.artistName)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        decoys.push(t);
+        if (out.length + decoys.length >= MIN) break;
+      }
+      out = seededShuffle([...out, ...decoys], `${seed}|mix`);
+    }
+    return out.slice(0, 8);
   }, [guess, tracks, current]);
   const startVisualizer = useCallback(async () => {
     const a = audio.current,
@@ -931,6 +1113,7 @@ export default function SongGame() {
         ),
       );
     } catch {}
+    setPlayedRef.current = [...setPlayedRef.current, item.trackId].slice(-10);
     setCurrent(item);
     setTracks(rest);
     setLevel(0);
@@ -945,7 +1128,50 @@ export default function SongGame() {
     paused.current = false;
     return true;
   }, []);
+  const loadByTrackIds = useCallback(
+    async (ids: number[], playMode: Mode) => {
+      setLoading(true);
+      setMessage("");
+      setKind("");
+      setLastSkipped(null);
+      const country = playMode === "foreign" ? "us" : "au";
+      try {
+        const res = await fetch(
+          `https://itunes.apple.com/lookup?id=${ids.join(",")}&entity=song&country=${country}`,
+        );
+        const data = await res.json();
+        const byId = new Map<number, Track>();
+        for (const x of (data.results || []) as Track[]) {
+          if (
+            x.wrapperType === "track" &&
+            x.previewUrl &&
+            x.trackName &&
+            x.artistName
+          )
+            byId.set(x.trackId, x);
+        }
+        const list = ids.map((id) => byId.get(id)).filter(Boolean) as Track[];
+        if (list.length < 10) throw Error("short");
+        setPlayedRef.current = [];
+        if (!takeNext(list)) throw Error();
+      } catch {
+        setMessage("Сорилын дуу ачаалж чадсангүй");
+        setKind("bad");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [takeNext],
+  );
   const load = useCallback(async () => {
+    if (!challengeReady) return;
+    if (lockedTrackIds?.length === 10) {
+      await loadByTrackIds(
+        lockedTrackIds,
+        mode,
+      );
+      return;
+    }
     setLoading(true);
     setMessage("");
     setKind("");
@@ -1029,6 +1255,7 @@ export default function SongGame() {
       list.sort(
         (a, b) => Number(recent.has(a.trackId)) - Number(recent.has(b.trackId)),
       );
+      setPlayedRef.current = [];
       if (!takeNext(list)) throw Error();
     } catch {
       setMessage("Ачаалж чадсангүй");
@@ -1036,11 +1263,67 @@ export default function SongGame() {
     } finally {
       setLoading(false);
     }
-  }, [mode, genre, takeNext]);
+  }, [
+    challengeReady,
+    lockedTrackIds,
+    loadByTrackIds,
+    mode,
+    genre,
+    takeNext,
+  ]);
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = new URLSearchParams(window.location.search)
+          .get("c")
+          ?.trim()
+          .toUpperCase();
+        if (raw) {
+          const res = await fetch(
+            `/api/challenge?code=${encodeURIComponent(raw)}`,
+            { cache: "no-store" },
+          );
+          if (res.ok) {
+            const data = await res.json();
+            const info = data.challenge as ChallengeInfo;
+            if (!cancelled) {
+              challengeCodeRef.current = info.code;
+              setChallenge(info);
+              setLockedTrackIds(info.trackIds);
+              setMode(info.mode === "foreign" ? "foreign" : "mongolian");
+              if (
+                info.difficulty === "easy" ||
+                info.difficulty === "medium" ||
+                info.difficulty === "hard" ||
+                info.difficulty === "expert"
+              )
+                setDifficulty(info.difficulty);
+              setChallengeOpen(true);
+              setChallengeNote(
+                info.full
+                  ? "Сорил дүүрсэн — оноо харна"
+                  : `${info.hostName}-ийн сорил · ${info.playerCount}/5`,
+              );
+            }
+          } else if (!cancelled) {
+            setChallengeNote("Сорил олдсонгүй эсвэл дууссан");
+          }
+        }
+      } catch {
+      } finally {
+        if (!cancelled) setChallengeReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  useEffect(() => {
+    if (!challengeReady) return;
     const id = setTimeout(() => void load(), 0);
     return () => clearTimeout(id);
-  }, [load]);
+  }, [load, challengeReady]);
   useEffect(() => {
     if (audio.current) audio.current.volume = volume;
   }, [volume]);
@@ -1166,10 +1449,22 @@ export default function SongGame() {
     const endOfSet = round >= 10;
     setTimeout(() => {
       if (endOfSet) {
+        lastSetIdsRef.current = [...setPlayedRef.current];
+        lastSetScoreRef.current = scoreRef.current;
+        lastSetStreakRef.current = streakRef.current;
+        setLastSetReady(setPlayedRef.current.length === 10);
+        if (challengeCodeRef.current) {
+          void submitChallengeResult(
+            scoreRef.current,
+            streakRef.current,
+          );
+          setChallengeOpen(true);
+        }
         void submitScore(false);
         setBoardOpen(true);
         setScore(0);
         setStreak(0);
+        setPlayedRef.current = [];
       }
       setRound((r) => (r >= 10 ? 1 : r + 1));
       if (!takeNext(tracks)) load();
@@ -1352,9 +1647,11 @@ export default function SongGame() {
                 key={d}
                 className={`diff ${difficulty === d ? "active" : ""}`}
                 onClick={() => {
+                  if (lockedTrackIds) return;
                   setDifficulty(d);
                   setLevel(0);
                 }}
+                disabled={!!lockedTrackIds}
               >
                 {diffLabel[d]}
               </button>
@@ -1391,7 +1688,9 @@ export default function SongGame() {
           <div className="pills">
             <button
               className={`pill ${mode === "mongolian" ? "on" : ""}`}
+              disabled={!!lockedTrackIds}
               onClick={() => {
+                if (lockedTrackIds) return;
                 setMode("mongolian");
                 setGenre("all");
                 setScore(0);
@@ -1403,7 +1702,9 @@ export default function SongGame() {
             </button>
             <button
               className={`pill ${mode === "foreign" ? "on" : ""}`}
+              disabled={!!lockedTrackIds}
               onClick={() => {
+                if (lockedTrackIds) return;
                 setMode("foreign");
                 setGenre("all");
                 setScore(0);
@@ -1424,6 +1725,20 @@ export default function SongGame() {
               <i />
               <b>{round}/10</b>
             </div>
+            {challenge && (
+              <button
+                className="board-btn hud-challenge"
+                type="button"
+                onClick={() => {
+                  setChallengeOpen(true);
+                  void refreshChallenge();
+                }}
+                title="Сорил"
+                aria-label="Сорил"
+              >
+                ⚔
+              </button>
+            )}
             <button
               className="board-btn hud-trophy"
               type="button"
@@ -1441,7 +1756,9 @@ export default function SongGame() {
             <button
               key={g}
               className={`chip ${genre === g ? "active" : ""}`}
+              disabled={!!lockedTrackIds}
               onClick={() => {
+                if (lockedTrackIds) return;
                 setGenre(g);
                 setRound(1);
               }}
@@ -1807,6 +2124,9 @@ export default function SongGame() {
                 })}
               </div>
               {submitNote && <p className="board-note">{submitNote}</p>}
+              {challengeNote && !challengeOpen && (
+                <p className="board-note">{challengeNote}</p>
+              )}
               <div className="board-actions">
                 <button
                   type="button"
@@ -1816,6 +2136,29 @@ export default function SongGame() {
                 >
                   Шинэчлэх
                 </button>
+                {challenge ? (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => {
+                      setBoardOpen(false);
+                      setChallengeOpen(true);
+                      void refreshChallenge();
+                    }}
+                  >
+                    Сорил
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => void createChallenge()}
+                    disabled={challengeBusy || !lastSetReady}
+                    title="Сүүлийн 10 дуугаар сорил үүсгэнэ"
+                  >
+                    Сорил үүсгэх
+                  </button>
+                )}
                 <button
                   type="button"
                   className="go"
@@ -1823,6 +2166,80 @@ export default function SongGame() {
                   disabled={score < 1}
                 >
                   Оноо илгээх
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {challengeOpen && challenge && (
+          <div
+            className="board-overlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setChallengeOpen(false);
+            }}
+          >
+            <div className="board-card challenge-card">
+              <div className="board-head">
+                <div>
+                  <small>CHALLENGE</small>
+                  <strong>
+                    {challenge.hostName}-ийн сорил · {challenge.playerCount}/5
+                  </strong>
+                </div>
+                <button
+                  type="button"
+                  className="board-close"
+                  onClick={() => setChallengeOpen(false)}
+                  aria-label="Хаах"
+                >
+                  ×
+                </button>
+              </div>
+              <p className="board-meta">
+                {diffLabel[challenge.difficulty as Difficulty] ||
+                  challenge.difficulty}{" "}
+                · {challenge.mode === "foreign" ? "Гадаад" : "Монгол"} · код{" "}
+                {challenge.code}
+              </p>
+              <div className="board-list">
+                {challenge.results.length === 0 && (
+                  <p className="board-empty">
+                    Одоогоор хоосон. 10 дуу таагаад оноо орно.
+                  </p>
+                )}
+                {challenge.results.map((e, i) => (
+                  <div
+                    key={e.id || `${e.name}-${i}`}
+                    className={`board-row ${playerName && e.name.toLowerCase() === playerName.toLowerCase() ? "me" : ""}`}
+                  >
+                    <span className="board-rank">{i + 1}</span>
+                    <span className="board-name">{e.name}</span>
+                    <span className="board-score">{e.score}</span>
+                  </div>
+                ))}
+              </div>
+              {challengeNote && <p className="board-note">{challengeNote}</p>}
+              {challenge.full && (
+                <p className="board-meta">Сорил дүүрсэн (5/5)</p>
+              )}
+              <div className="board-actions">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => void refreshChallenge()}
+                  disabled={challengeBusy}
+                >
+                  Шинэчлэх
+                </button>
+                <button
+                  type="button"
+                  className="go"
+                  onClick={() => void copyInvite()}
+                >
+                  {inviteCopied ? "Хуулсан!" : "Link хуулах"}
                 </button>
               </div>
             </div>
