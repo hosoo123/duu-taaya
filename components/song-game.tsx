@@ -533,6 +533,7 @@ export default function SongGame() {
     partyCodeRef = useRef<string | null>(null),
     partyAppliedRef = useRef(false),
     partyJoinAttemptRef = useRef<string | null>(null),
+    partyResumeRef = useRef(0),
     limits = difficultyLimits[difficulty];
   const isPartyHost =
     !!party &&
@@ -738,7 +739,7 @@ export default function SongGame() {
       )
         setDifficulty(info.difficulty);
     }
-    if (info.status !== "lobby" && info.trackIds.length === 10) {
+    if (info.status !== "lobby" && info.trackIds.length >= 8) {
       setLockedTrackIds((prev) => {
         if (
           prev &&
@@ -750,10 +751,14 @@ export default function SongGame() {
       });
       if (!partyAppliedRef.current) {
         partyAppliedRef.current = true;
-        setScore(0);
-        setStreak(0);
-        setRound(1);
-        setPlayedRef.current = [];
+        const meName = (nameRef.current || "").toLowerCase();
+        const me = info.players.find((p) => p.name.toLowerCase() === meName);
+        const done = Math.max(0, Math.min(10, me?.roundsDone || 0));
+        partyResumeRef.current = done;
+        setScore(me?.score || 0);
+        setStreak(me?.streak || 0);
+        setRound(done >= 10 ? 10 : done + 1);
+        setPlayedRef.current = info.trackIds.slice(0, done);
       }
     }
     if (!soft) {
@@ -928,6 +933,7 @@ export default function SongGame() {
     partyCodeRef.current = null;
     partyAppliedRef.current = false;
     partyJoinAttemptRef.current = null;
+    partyResumeRef.current = 0;
     setParty(null);
     setLockedTrackIds(null);
     setPartyNote("");
@@ -1373,8 +1379,20 @@ export default function SongGame() {
         }
         const list = ids.map((id) => byId.get(id)).filter(Boolean) as Track[];
         if (list.length < 8) throw Error("short");
-        setPlayedRef.current = [];
-        if (!takeNext(list)) throw Error();
+        const resume = Math.max(
+          0,
+          Math.min(partyResumeRef.current, list.length),
+        );
+        partyResumeRef.current = 0;
+        setPlayedRef.current = list.slice(0, resume).map((t) => t.trackId);
+        const remaining = list.slice(resume);
+        if (remaining.length === 0) {
+          setMessage("Party дууссан — оноо харна");
+          setKind("good");
+          setGameModeOpen(true);
+          return;
+        }
+        if (!takeNext(remaining)) throw Error();
       } catch {
         setMessage("Party дуу ачаалж чадсангүй");
         setKind("bad");
@@ -1501,7 +1519,6 @@ export default function SongGame() {
           .trim()
           .toUpperCase();
         if (raw) {
-          // Invite link: room харуулна, join нь нэвтэрсний дараа
           const res = await fetch(
             `/api/party?code=${encodeURIComponent(raw)}`,
             { cache: "no-store" },
@@ -1509,14 +1526,20 @@ export default function SongGame() {
           if (res.ok) {
             const data = await res.json();
             if (!cancelled && data.room) {
-              partyCodeRef.current = raw;
-              setParty(data.room as PartyRoomInfo);
-              setGameModeOpen(true);
-              setPartyNote(
-                clerkEnabled
-                  ? "Нэвтэрээд room-д орно уу"
-                  : "Нэрээ оруулаад room-д ор",
-              );
+              const info = data.room as PartyRoomInfo;
+              partyAppliedRef.current = false;
+              applyParty(info);
+              if (info.status === "lobby") {
+                setGameModeOpen(true);
+                setPartyNote(
+                  clerkEnabled
+                    ? "Нэвтэрээд room-д орно уу"
+                    : "Room lobby — нэвтэрээд нэгд",
+                );
+              } else {
+                setGameModeOpen(false);
+                setPartyNote("");
+              }
             }
           } else if (!cancelled) {
             setPartyNote("Room олдсонгүй эсвэл дууссан");
@@ -1531,15 +1554,24 @@ export default function SongGame() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [applyParty]);
   useEffect(() => {
     if (!bootReady || !partyAuthed) return;
     const name = nameRef.current || playerName;
     if (!name || name.length < 2) return;
     const code = partyCodeRef.current;
     if (!code) return;
-    if (party?.players.some((p) => p.name.toLowerCase() === name.toLowerCase()))
+    const alreadyIn = party?.players.some(
+      (p) => p.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (alreadyIn) {
+      // Refresh: аль хэдийн тоглогч — track lock дахин баталгаажуулна
+      if (party && party.status !== "lobby" && !lockedTrackIds?.length) {
+        partyAppliedRef.current = false;
+        applyParty(party);
+      }
       return;
+    }
     if (party && party.status !== "lobby") return;
     const attemptKey = `${code}|${name.toLowerCase()}`;
     if (partyJoinAttemptRef.current === attemptKey) return;
@@ -1549,10 +1581,10 @@ export default function SongGame() {
     bootReady,
     partyAuthed,
     playerName,
-    party?.code,
-    party?.status,
-    party?.players,
+    party,
+    lockedTrackIds,
     joinParty,
+    applyParty,
   ]);
   useEffect(() => {
     if (!bootReady) return;
