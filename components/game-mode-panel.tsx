@@ -34,33 +34,39 @@ const MODES: {
   id: GameModeId;
   title: string;
   blurb: string;
-  tag: string;
+  hint: string;
 }[] = [
   {
     id: "party",
-    title: "Party Room",
-    blurb: "Найзуудтайгаа ижил 10 дуу. Lobby → зэрэг тоглоод live оноо.",
-    tag: "BEST",
+    title: "Party",
+    blurb: "Олон хүн, ижил дуу, live оноо",
+    hint: "8 хүртэл",
   },
   {
     id: "duel",
-    title: "1v1 Duel",
-    blurb: "Хоёр хүн. Ижил дуунууд — хэн илүү оноо цуглуулах вэ.",
-    tag: "VS",
+    title: "1v1",
+    blurb: "Хоёр хүн — хэн түрүүлнэ",
+    hint: "VS",
   },
   {
     id: "streak",
-    title: "Shared Streak",
-    blurb: "Багийн streak. Нэг хүн буруу таавал бүгдийн streak унана.",
-    tag: "TEAM",
+    title: "Streak",
+    blurb: "Нэг streak-ээ хамт барина",
+    hint: "Team",
   },
   {
     id: "hotseat",
     title: "Hot Seat",
-    blurb: "Нэг утас. Ээлжлэн таа — phone-оо дараагийн хүнд өг.",
-    tag: "LOCAL",
+    blurb: "Нэг утас, ээлжлэн таа",
+    hint: "Local",
   },
 ];
+
+const statusLabel = (s: PartyRoomInfo["status"]) =>
+  s === "lobby" ? "Lobby" : s === "finished" ? "Дууссан" : "Тоглож байна";
+
+const kindLabel = (kind: PartyRoomInfo["kind"]) =>
+  kind === "duel" ? "1v1" : kind === "streak" ? "Streak" : "Party";
 
 export function GameModePanel({
   open,
@@ -90,17 +96,23 @@ export function GameModePanel({
   const [seatDraft, setSeatDraft] = useState("Чи\nНайз");
 
   useEffect(() => {
-    if (!open) setView("menu");
+    if (!open) {
+      setView("menu");
+      setJoinCode("");
+    }
   }, [open]);
 
   if (!open) return null;
 
-  const kindLabel =
-    room?.kind === "duel"
-      ? "1v1 Duel"
-      : room?.kind === "streak"
-        ? "Shared Streak"
-        : "Party Room";
+  const title = room
+    ? kindLabel(room.kind)
+    : hotSeatNames.length > 0
+      ? "Hot Seat"
+      : view === "join"
+        ? "Room-д орох"
+        : view === "hotseat-setup"
+          ? "Hot Seat"
+          : "Хамт тоглох";
 
   return (
     <div
@@ -115,13 +127,7 @@ export function GameModePanel({
         <div className="board-head">
           <div>
             <small>GAME MODE</small>
-            <strong>
-              {room
-                ? kindLabel
-                : hotSeatNames.length > 0
-                  ? "Hot Seat"
-                  : "Multiplayer"}
-            </strong>
+            <strong>{title}</strong>
           </div>
           <button
             type="button"
@@ -135,16 +141,20 @@ export function GameModePanel({
 
         {room ? (
           <>
-            <p className="board-meta">
-              код <b>{room.code}</b> · {room.playerCount}/{room.maxPlayers} ·{" "}
-              {room.status === "lobby"
-                ? "lobby"
-                : room.status === "finished"
-                  ? "дууссан"
-                  : "тоглож байна"}
-              {room.sharedStreak ? " · shared streak" : ""}
-            </p>
-            <div className="board-list">
+            <div className="gm-code-row">
+              <div className="gm-code">
+                <span>код</span>
+                <b>{room.code}</b>
+              </div>
+              <div className="gm-status">
+                <i className={`gm-dot ${room.status}`} />
+                {statusLabel(room.status)}
+                <span>
+                  {room.playerCount}/{room.maxPlayers}
+                </span>
+              </div>
+            </div>
+            <div className="board-list gm-list">
               {room.players.map((p, i) => (
                 <div
                   key={p.id}
@@ -158,7 +168,7 @@ export function GameModePanel({
                     </span>
                     <span className="board-diffs">
                       <span>{p.roundsDone}/10</span>
-                      {p.streak > 0 && <span>streak {p.streak}</span>}
+                      {p.streak > 0 && <span>×{p.streak}</span>}
                     </span>
                   </div>
                   <span className="board-score">{p.score}</span>
@@ -166,7 +176,7 @@ export function GameModePanel({
               ))}
             </div>
             {note && <p className="board-note">{note}</p>}
-            <div className="board-actions">
+            <div className="board-actions gm-actions">
               <button
                 type="button"
                 className="ghost"
@@ -176,7 +186,7 @@ export function GameModePanel({
                 Шинэчлэх
               </button>
               <button type="button" className="ghost" onClick={onCopyInvite}>
-                {inviteCopied ? "Хуулсан!" : "Link хуулах"}
+                {inviteCopied ? "Хуулсан" : "Link"}
               </button>
               {isHost && room.status === "lobby" && (
                 <button
@@ -201,9 +211,12 @@ export function GameModePanel({
         ) : hotSeatNames.length > 0 ? (
           <>
             <p className="board-meta">
-              Ээлж: <b>{hotSeatNames[hotSeatTurn % hotSeatNames.length]}</b>
+              Одоо:{" "}
+              <b className="gm-turn">
+                {hotSeatNames[hotSeatTurn % hotSeatNames.length]}
+              </b>
             </p>
-            <div className="board-list">
+            <div className="board-list gm-list">
               {hotSeatNames.map((n, i) => (
                 <div
                   key={`${n}-${i}`}
@@ -214,7 +227,7 @@ export function GameModePanel({
                 </div>
               ))}
             </div>
-            <div className="board-actions">
+            <div className="board-actions gm-actions">
               <button type="button" className="go" onClick={onClose}>
                 Тоглох
               </button>
@@ -225,17 +238,20 @@ export function GameModePanel({
           </>
         ) : view === "join" ? (
           <>
-            <p className="board-meta">Найзынхаа room код оруул</p>
+            <p className="board-meta">Найзынхаа 6 оронтой кодыг бич</p>
             <input
-              className="game-mode-input"
+              className="gm-input"
               value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+              onChange={(e) =>
+                setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+              }
               placeholder="ABC123"
               maxLength={8}
               autoCapitalize="characters"
+              autoFocus
             />
             {note && <p className="board-note">{note}</p>}
-            <div className="board-actions">
+            <div className="board-actions gm-actions">
               <button
                 type="button"
                 className="ghost"
@@ -255,15 +271,16 @@ export function GameModePanel({
           </>
         ) : view === "hotseat-setup" ? (
           <>
-            <p className="board-meta">Нэрүүд — мөр бүрт нэг тоглогч</p>
+            <p className="board-meta">Мөр бүрт нэг нэр (2–6 хүн)</p>
             <textarea
-              className="game-mode-input game-mode-area"
+              className="gm-input gm-area"
               value={seatDraft}
               onChange={(e) => setSeatDraft(e.target.value)}
               rows={4}
+              autoFocus
             />
             {note && <p className="board-note">{note}</p>}
-            <div className="board-actions">
+            <div className="board-actions gm-actions">
               <button
                 type="button"
                 className="ghost"
@@ -292,33 +309,32 @@ export function GameModePanel({
           <>
             <p className="board-meta">
               {mode === "foreign" ? "Гадаад" : "Монгол"} · {difficulty}
-              {!playerName && " · эхлээд нэрээ оруул"}
+              {!playerName ? " · нэрээ оруул" : ""}
             </p>
-            <div className="game-mode-grid">
+            <div className="gm-grid">
               {MODES.map((m) => (
                 <button
                   key={m.id}
                   type="button"
-                  className="game-mode-tile"
+                  className={`gm-tile${m.id === "party" ? " featured" : ""}`}
                   disabled={busy || (!playerName && m.id !== "hotseat")}
                   onClick={() => {
                     onPickMode(m.id);
                     if (m.id === "hotseat") setView("hotseat-setup");
-                    else if (m.id === "party" || m.id === "duel" || m.id === "streak")
-                      onCreateParty(m.id);
+                    else onCreateParty(m.id);
                   }}
                 >
-                  <span className="game-mode-tag">{m.tag}</span>
+                  <span className="gm-tile-hint">{m.hint}</span>
                   <strong>{m.title}</strong>
-                  <span>{m.blurb}</span>
+                  <span className="gm-tile-blurb">{m.blurb}</span>
                 </button>
               ))}
             </div>
             {note && <p className="board-note">{note}</p>}
-            <div className="board-actions">
+            <div className="board-actions gm-actions">
               <button
                 type="button"
-                className="ghost"
+                className="ghost gm-join-btn"
                 onClick={() => setView("join")}
                 disabled={!playerName}
               >

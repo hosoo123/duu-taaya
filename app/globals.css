@@ -137,82 +137,171 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  background: linear-gradient(145deg, #1a2228, #100e12);
-  box-shadow: inset 0 0 0 1px #6ec8ff33, 0 8px 20px #6ec8ff18;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  background: linear-gradient(145deg, #1c1824, #100e14);
+  box-shadow: inset 0 0 0 1px #ffffff14, 0 8px 20px #0004;
+  font-size: 17px;
+  font-weight: 700;
+  color: #c8b8c4;
 }
-.challenge-card .board-meta,
+.board-btn.hud-challenge:hover {
+  color: #fff;
+  box-shadow: inset 0 0 0 1px #ff2f5544, 0 8px 20px #ff2f5520;
+}
+.game-mode-card {
+  width: min(400px, 100%);
+  gap: 14px;
+}
 .game-mode-card .board-meta {
   word-break: break-word;
 }
-.game-mode-grid {
+.gm-grid {
   display: grid;
-  gap: 10px;
-  margin: 12px 0 4px;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
-.game-mode-tile {
+.gm-tile {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
-  width: 100%;
-  padding: 14px 14px 12px;
-  border: 0;
+  gap: 4px;
+  min-height: 96px;
+  padding: 12px 12px 11px;
   border-radius: 14px;
-  background: linear-gradient(160deg, #1a141c, #100c12);
-  box-shadow: inset 0 0 0 1px #ffffff10;
-  color: #f2e9ef;
+  background: #100c12;
+  box-shadow: inset 0 0 0 1px #ffffff0c;
   text-align: left;
-  cursor: pointer;
+  transition: 0.15s ease;
 }
-.game-mode-tile:hover:not(:disabled) {
-  filter: brightness(1.08);
-  box-shadow: inset 0 0 0 1px #6ec8ff44;
+.gm-tile.featured {
+  background: linear-gradient(155deg, #241018, #120c12);
+  box-shadow: inset 0 0 0 1px #ff2f5538;
 }
-.game-mode-tile:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.gm-tile:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px #ff2f5555;
 }
-.game-mode-tile strong {
+.gm-tile:disabled {
+  opacity: 0.4;
+}
+.gm-tile strong {
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 800;
+  letter-spacing: -0.02em;
 }
-.game-mode-tile > span:last-child {
-  color: var(--mute);
-  font-size: 12px;
-  line-height: 1.35;
-}
-.game-mode-tag {
-  display: inline-flex;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #6ec8ff22;
-  color: #9fd9ff;
+.gm-tile-hint {
   font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-2);
 }
-.game-mode-input {
-  width: 100%;
-  margin: 8px 0 4px;
-  padding: 12px 14px;
-  border: 0;
+.gm-tile-blurb {
+  margin-top: auto;
+  color: var(--mute);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.gm-code-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gm-code {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
   border-radius: 12px;
-  background: #120d14;
-  color: #f2e9ef;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  box-shadow: inset 0 0 0 1px #ffffff14;
+  background: #100c12;
+  box-shadow: inset 0 0 0 1px #ffffff10;
 }
-.game-mode-area {
+.gm-code span {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.gm-code b {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #fff;
+}
+.gm-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mute);
+  font-size: 11px;
+  font-weight: 700;
+}
+.gm-status span {
+  color: var(--ink);
+}
+.gm-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+.gm-dot.lobby {
+  background: #6ec8ff;
+  box-shadow: 0 0 8px #6ec8ff66;
+}
+.gm-dot.playing {
+  background: var(--good);
+  box-shadow: 0 0 8px #3ddc9766;
+}
+.gm-dot.finished {
+  background: var(--accent);
+}
+.gm-list {
+  min-height: 100px;
+  max-height: 220px;
+}
+.gm-turn {
+  color: var(--accent-2);
+}
+.gm-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: #100c12;
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-align: center;
+  box-shadow: inset 0 0 0 1px #ffffff12;
+  outline: none;
+}
+.gm-input:focus {
+  box-shadow: inset 0 0 0 1px #ff2f5555;
+}
+.gm-input::placeholder {
+  color: var(--faint);
+  letter-spacing: 0.12em;
+}
+.gm-area {
   letter-spacing: 0;
+  font-size: 14px;
   font-weight: 600;
+  text-align: left;
   resize: vertical;
-  min-height: 96px;
+  min-height: 110px;
+  line-height: 1.5;
+}
+.gm-actions {
+  flex-wrap: wrap;
+}
+.gm-join-btn {
+  flex: 1;
 }
 .name-chip {
   max-width: 96px;

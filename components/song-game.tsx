@@ -2022,10 +2022,10 @@ export default function SongGame() {
                 setPartyNote("");
                 setGameModeOpen(true);
               }}
-              title="Game Mode"
-              aria-label="Game Mode"
+              title="Хамт тоглох"
+              aria-label="Хамт тоглох"
             >
-              GM
+              ◈
             </button>
           </div>
         </header>
@@ -2457,7 +2457,7 @@ export default function SongGame() {
                     setGameModeOpen(true);
                   }}
                 >
-                  Game Mode
+                  Хамт тоглох
                 </button>
                 <button
                   type="button"
