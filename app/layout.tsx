@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, Unbounded } from "next/font/google";
+import AppClerkProvider from "@/components/app-clerk-provider";
 import "./globals.css";
 
 const display = Unbounded({
@@ -16,7 +17,8 @@ const body = Manrope({
 
 export const metadata: Metadata = {
   title: "Дуугаа Таа — Монгол дуу таах тоглоом",
-  description: "Монгол болон гадаад дууны богино хэсгийг сонсоод нэрийг нь таах тоглоом.",
+  description:
+    "Монгол болон гадаад дууны богино хэсгийг сонсоод нэрийг нь таах тоглоом.",
   other: {
     "codex-preview": "development",
   },
@@ -33,7 +35,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="mn" className={`${display.variable} ${body.variable}`}>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <AppClerkProvider>{children}</AppClerkProvider>
+      </body>
     </html>
   );
 }

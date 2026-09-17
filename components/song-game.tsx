@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 import {
   animeRomajiByCanon,
   animeRomajiDisplay,
@@ -15,6 +16,8 @@ import {
   type Genre,
   type Mode,
 } from "@/data/catalog";
+import { clerkEnabled } from "@/components/app-clerk-provider";
+import ClerkIdentityBridge from "@/components/clerk-identity-bridge";
 type Track = {
   trackId: number;
   artistId: number;
@@ -62,7 +65,7 @@ const canonicalTitle = (s: string) =>
         "",
       )
       .replace(
-        /\s*[\[(][^)\]]*(?:ft\.?|feat\.?|featuring)[^)\]]*[\])]/gi,
+        /\s*[\[(][^)\]]*(?:ft\.?|feat\.?|featuring|from\s+)[^)\]]*[\])]/gi,
         "",
       )
       .replace(
@@ -226,6 +229,17 @@ const animeAliases: Record<string, string[]> = {
   cityhunter: ["cityhunter"],
   onepunchman: ["onepunchman", "opm"],
   steinsgate: ["steinsgate", "steins gate"],
+  frierenbeyondjourneysend: ["frieren", "sousounofrieren"],
+  sololeveling: ["sololeveling", "solo leveling"],
+  bocchitherock: ["bocchi", "bocchitherock"],
+  deliciousindungeon: ["deliciousindungeon", "dungeonmeshi"],
+  demonslayerhashiratrainingarc: ["demonslayer", "hashira", "kimetsu"],
+  kaijuno8: ["kaiju", "kaijuno8"],
+  tokyorevengers: ["tokyorevengers", "tr"],
+  windbreaker: ["windbreaker"],
+  spyxfamily: ["spyxfamily", "sxf", "spyfamily"],
+  demonslayerentertainmentdistrictarc: ["demonslayer", "kimetsu"],
+  demonslayermugentrainarc: ["demonslayer", "mugentrain", "kimetsu"],
 };
 const animeHit = (t: Track, q: string) => {
   const a = animeOf(t);
@@ -337,6 +351,7 @@ type ChallengeInfo = {
 };
 const LOCAL_BOARD_KEY = "duuTaayaBoard";
 const NAME_KEY = "duuTaayaName";
+const GUEST_KEY = "duuTaayaGuest";
 const cleanName = (raw: string) =>
   raw
     .replace(/[^\p{L}\p{N} _.-]/gu, "")
@@ -456,7 +471,8 @@ export default function SongGame() {
     [challengeBusy, setChallengeBusy] = useState(false),
     [challengeNote, setChallengeNote] = useState(""),
     [inviteCopied, setInviteCopied] = useState(false),
-    [lastSetReady, setLastSetReady] = useState(false);
+    [lastSetReady, setLastSetReady] = useState(false),
+    [clerkSignedIn, setClerkSignedIn] = useState(false);
   const audio = useRef<HTMLAudioElement>(null),
     wave = useRef<HTMLDivElement>(null),
     searchbox = useRef<HTMLDivElement>(null),
@@ -502,15 +518,41 @@ export default function SongGame() {
   useEffect(() => {
     try {
       const n = cleanName(localStorage.getItem(NAME_KEY) || "");
+      const guest = localStorage.getItem(GUEST_KEY) === "1";
       if (n) {
         setPlayerName(n);
         setNameDraft(n);
+      } else if (guest) {
+        setPlayerName("Зочин");
+        setNameDraft("Зочин");
+        nameRef.current = "Зочин";
       } else setNameOpen(true);
       setBoard(readLocalBoard());
     } catch {
       setNameOpen(true);
     }
   }, []);
+  const onClerkIdentity = useCallback(
+    (info: {
+      signedIn: boolean;
+      name: string | null;
+      loaded: boolean;
+    }) => {
+      setClerkSignedIn(info.signedIn);
+      if (!info.loaded) return;
+      if (info.signedIn && info.name) {
+        setPlayerName(info.name);
+        setNameDraft(info.name);
+        nameRef.current = info.name;
+        try {
+          localStorage.setItem(NAME_KEY, info.name);
+          localStorage.removeItem(GUEST_KEY);
+        } catch {}
+        setNameOpen(false);
+      }
+    },
+    [],
+  );
   useEffect(() => {
     sfxVolRef.current = sfxVolume;
     try {
@@ -525,9 +567,21 @@ export default function SongGame() {
     nameRef.current = n;
     try {
       localStorage.setItem(NAME_KEY, n);
+      localStorage.setItem(GUEST_KEY, "1");
     } catch {}
     setNameOpen(false);
     return true;
+  };
+  const continueAsGuest = (raw?: string) => {
+    const n = cleanName(raw || nameDraft) || "Зочин";
+    setPlayerName(n);
+    setNameDraft(n);
+    nameRef.current = n;
+    try {
+      localStorage.setItem(NAME_KEY, n);
+      localStorage.setItem(GUEST_KEY, "1");
+    } catch {}
+    setNameOpen(false);
   };
   const refreshBoard = useCallback(async () => {
     setBoardBusy(true);
@@ -1229,7 +1283,7 @@ export default function SongGame() {
       if (genre === "new")
         list = list.filter(
           (x) =>
-            x.releaseDate && new Date(x.releaseDate) >= new Date("2025-01-01"),
+            x.releaseDate && new Date(x.releaseDate) >= new Date("2023-01-01"),
         );
       if (genre === "nineties")
         list = list.filter((x) => {
@@ -1658,17 +1712,62 @@ export default function SongGame() {
             ))}
           </div>
         </div>
-        <button
-          className="name-chip"
-          type="button"
-          onClick={() => {
-            setNameDraft(playerName);
-            setNameOpen(true);
-          }}
-          title="Нэр солих"
-        >
-          {playerName || "Нэр?"}
-        </button>
+        {clerkEnabled && (
+          <ClerkIdentityBridge onIdentity={onClerkIdentity} />
+        )}
+        {clerkEnabled ? (
+          <>
+            <Show when="signed-in">
+              <div className="name-chip name-chip-auth" title="Clerk хаяг">
+                <UserButton
+                  appearance={{
+                    elements: {
+                      avatarBox: { width: 28, height: 28 },
+                    },
+                  }}
+                />
+                <span>{playerName || "User"}</span>
+              </div>
+            </Show>
+            <Show when="signed-out">
+              <div className="auth-rail">
+                <SignInButton mode="modal">
+                  <button type="button" className="name-chip auth-mini">
+                    Нэвтрэх
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button type="button" className="name-chip auth-mini">
+                    Бүртгүүлэх
+                  </button>
+                </SignUpButton>
+                <button
+                  className="name-chip"
+                  type="button"
+                  onClick={() => {
+                    setNameDraft(playerName);
+                    setNameOpen(true);
+                  }}
+                  title="Зочны нэр"
+                >
+                  {playerName || "Зочин"}
+                </button>
+              </div>
+            </Show>
+          </>
+        ) : (
+          <button
+            className="name-chip"
+            type="button"
+            onClick={() => {
+              setNameDraft(playerName);
+              setNameOpen(true);
+            }}
+            title="Нэр солих"
+          >
+            {playerName || "Нэр?"}
+          </button>
+        )}
         <button
           className="reset"
           onClick={() => {
@@ -2018,8 +2117,27 @@ export default function SongGame() {
         {nameOpen && (
           <div className="board-overlay" role="dialog" aria-modal="true">
             <div className="board-card name-card">
-              <small>ТОГЛОГЧИЙН НЭР</small>
-              <strong>Leaderboard-д гарах нэр</strong>
+              <small>ТОГЛОГЧ</small>
+              <strong>
+                {clerkEnabled ? "Нэвтэр эсвэл зочиноор тогло" : "Leaderboard нэр"}
+              </strong>
+              {clerkEnabled && (
+                <div className="auth-row">
+                  <SignInButton mode="modal">
+                    <button type="button" className="go auth-clerk">
+                      Нэвтрэх
+                    </button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button type="button" className="ghost auth-clerk">
+                      Бүртгүүлэх
+                    </button>
+                  </SignUpButton>
+                </div>
+              )}
+              <p className="board-meta auth-or">
+                {clerkEnabled ? "эсвэл зочны нэр" : "Нэрээ бичнэ үү"}
+              </p>
               <input
                 value={nameDraft}
                 maxLength={16}
@@ -2027,25 +2145,29 @@ export default function SongGame() {
                 placeholder="Жнь: Hoso"
                 onChange={(e) => setNameDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") saveName(nameDraft);
+                  if (e.key === "Enter") {
+                    if (cleanName(nameDraft).length >= 2) saveName(nameDraft);
+                    else continueAsGuest();
+                  }
                 }}
               />
               <div className="board-actions">
-                {playerName && (
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={() => setNameOpen(false)}
-                  >
-                    Болих
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => continueAsGuest()}
+                >
+                  Зочиноор тоглох
+                </button>
                 <button
                   type="button"
                   className="go"
-                  onClick={() => saveName(nameDraft)}
+                  onClick={() => {
+                    if (cleanName(nameDraft).length >= 2) saveName(nameDraft);
+                    else continueAsGuest(nameDraft);
+                  }}
                 >
-                  Хадгалах
+                  Үргэлжлүүлэх
                 </button>
               </div>
             </div>

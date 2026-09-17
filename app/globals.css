@@ -145,7 +145,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   word-break: break-word;
 }
 .name-chip {
-  max-width: 72px;
+  max-width: 96px;
   padding: 6px 8px;
   border-radius: 10px;
   background: #120d14;
@@ -156,6 +156,40 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.name-chip-auth {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 120px;
+}
+.name-chip-auth > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.auth-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  align-items: stretch;
+}
+.auth-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.auth-mini {
+  width: 100%;
+  max-width: none;
+  text-align: center;
+}
+.auth-clerk {
+  width: 100%;
+}
+.auth-or {
+  margin: 0 !important;
+  text-align: center;
 }
 .name-chip:hover { color: #fff; }
 
