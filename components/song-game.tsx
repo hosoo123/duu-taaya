@@ -18,6 +18,8 @@ import {
 } from "@/data/catalog";
 import { clerkEnabled } from "@/components/app-clerk-provider";
 import ClerkIdentityBridge from "@/components/clerk-identity-bridge";
+import { GameModePanel, type GameModeId } from "@/components/game-mode-panel";
+import type { PartyKind, PartyRoomInfo } from "@/lib/party";
 type Track = {
   trackId: number;
   artistId: number;
@@ -366,26 +368,6 @@ type BoardEntry = {
   at: number;
 };
 type CommentEntry = { id: string; name: string; body: string; at: number };
-type ChallengeResult = {
-  id: string;
-  name: string;
-  score: number;
-  streak: number;
-  at: number;
-};
-type ChallengeInfo = {
-  code: string;
-  mode: string;
-  difficulty: string;
-  trackIds: number[];
-  hostName: string;
-  createdAt: number;
-  expiresAt: number;
-  playerCount: number;
-  maxPlayers: number;
-  full: boolean;
-  results: ChallengeResult[];
-};
 const LOCAL_BOARD_KEY = "duuTaayaBoard";
 const NAME_KEY = "duuTaayaName";
 const GUEST_KEY = "duuTaayaGuest";
@@ -394,6 +376,14 @@ const cleanName = (raw: string) =>
     .replace(/[^\p{L}\p{N} _.-]/gu, "")
     .trim()
     .slice(0, 16);
+const pickSetIds = (pool: Track[], mode: Mode) => {
+  const fromPool = [...new Set(pool.map((t) => t.trackId))];
+  if (fromPool.length >= 10) return shuffle(fromPool).slice(0, 10);
+  const featured =
+    mode === "mongolian" ? mongolianFeatured : foreignFeatured;
+  const ids = [...new Set(Object.values(featured).flat())];
+  return shuffle(ids).slice(0, 10);
+};
 const diffScores = (e: BoardEntry) => ({
   easyScore: e.easyScore ?? (e.difficulty === "easy" ? e.score : 0),
   mediumScore: e.mediumScore ?? (e.difficulty === "medium" ? e.score : 0),
@@ -501,14 +491,16 @@ export default function SongGame() {
     [commentDraft, setCommentDraft] = useState(""),
     [commentsBusy, setCommentsBusy] = useState(false),
     [commentNote, setCommentNote] = useState(""),
-    [challengeReady, setChallengeReady] = useState(false),
-    [challenge, setChallenge] = useState<ChallengeInfo | null>(null),
+    [bootReady, setBootReady] = useState(false),
+    [party, setParty] = useState<PartyRoomInfo | null>(null),
     [lockedTrackIds, setLockedTrackIds] = useState<number[] | null>(null),
-    [challengeOpen, setChallengeOpen] = useState(false),
-    [challengeBusy, setChallengeBusy] = useState(false),
-    [challengeNote, setChallengeNote] = useState(""),
+    [gameModeOpen, setGameModeOpen] = useState(false),
+    [partyBusy, setPartyBusy] = useState(false),
+    [partyNote, setPartyNote] = useState(""),
     [inviteCopied, setInviteCopied] = useState(false),
-    [lastSetReady, setLastSetReady] = useState(false),
+    [hotSeatNames, setHotSeatNames] = useState<string[]>([]),
+    [hotSeatTurn, setHotSeatTurn] = useState(0),
+    [hotSeatScores, setHotSeatScores] = useState<Record<string, number>>({}),
     [clerkSignedIn, setClerkSignedIn] = useState(false);
   const audio = useRef<HTMLAudioElement>(null),
     wave = useRef<HTMLDivElement>(null),
@@ -531,8 +523,13 @@ export default function SongGame() {
     lastSetIdsRef = useRef<number[]>([]),
     lastSetScoreRef = useRef(0),
     lastSetStreakRef = useRef(0),
-    challengeCodeRef = useRef<string | null>(null),
+    partyCodeRef = useRef<string | null>(null),
+    partyAppliedRef = useRef(false),
     limits = difficultyLimits[difficulty];
+  const isPartyHost =
+    !!party &&
+    !!playerName &&
+    playerName.toLowerCase() === party.hostKey;
   useEffect(() => {
     scoreRef.current = score;
   }, [score]);
@@ -713,12 +710,12 @@ export default function SongGame() {
     void refreshBoard();
   };
   const inviteUrl = (code: string) => {
-    if (typeof window === "undefined") return `/?c=${code}`;
-    return `${window.location.origin}${window.location.pathname}?c=${code}`;
+    if (typeof window === "undefined") return `/?p=${code}`;
+    return `${window.location.origin}${window.location.pathname}?p=${code}`;
   };
-  const applyChallenge = useCallback((info: ChallengeInfo) => {
-    challengeCodeRef.current = info.code;
-    setChallenge(info);
+  const applyParty = useCallback((info: PartyRoomInfo) => {
+    partyCodeRef.current = info.code;
+    setParty(info);
     setMode(info.mode === "foreign" ? "foreign" : "mongolian");
     if (
       info.difficulty === "easy" ||
@@ -727,108 +724,197 @@ export default function SongGame() {
       info.difficulty === "expert"
     )
       setDifficulty(info.difficulty);
+    if (info.status !== "lobby" && info.trackIds.length === 10) {
+      setLockedTrackIds(info.trackIds);
+      if (!partyAppliedRef.current) {
+        partyAppliedRef.current = true;
+        setScore(0);
+        setStreak(0);
+        setRound(1);
+        setPlayedRef.current = [];
+      }
+    }
     try {
       const url = new URL(window.location.href);
-      url.searchParams.set("c", info.code);
+      url.searchParams.set("p", info.code);
+      url.searchParams.delete("c");
       window.history.replaceState({}, "", url.toString());
     } catch {}
   }, []);
-  const refreshChallenge = useCallback(async (code?: string) => {
-    const c = (code || challengeCodeRef.current || "").toUpperCase();
+  const refreshParty = useCallback(async (code?: string) => {
+    const c = (code || partyCodeRef.current || "").toUpperCase();
     if (!c) return null;
     try {
-      const res = await fetch(`/api/challenge?code=${encodeURIComponent(c)}`, {
+      const res = await fetch(`/api/party?code=${encodeURIComponent(c)}`, {
         cache: "no-store",
       });
       if (!res.ok) return null;
       const data = await res.json();
-      const info = data.challenge as ChallengeInfo;
-      setChallenge(info);
-      challengeCodeRef.current = info.code;
+      const info = data.room as PartyRoomInfo;
+      applyParty(info);
       return info;
     } catch {
       return null;
     }
-  }, []);
-  const submitChallengeResult = useCallback(
-    async (points: number, st: number) => {
-      const code = challengeCodeRef.current;
+  }, [applyParty]);
+  const submitPartyScore = useCallback(
+    async (points: number, st: number, roundsDone: number) => {
+      const code = partyCodeRef.current;
       const name = nameRef.current || playerName;
-      if (!code || !name || points < 1) return;
+      if (!code || !name) return;
       try {
-        const res = await fetch("/api/challenge/result", {
+        const res = await fetch("/api/party/score", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ code, name, score: points, streak: st }),
+          body: JSON.stringify({
+            code,
+            name,
+            score: points,
+            streak: st,
+            roundsDone,
+          }),
         });
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data.challenge) {
-          setChallenge(data.challenge as ChallengeInfo);
-          setChallengeNote(
-            data.updated
-              ? "Сорилд оноо хадгаллаа"
-              : "Өмнөх сорилын онооноос бага",
-          );
-        } else if (data.error === "full") {
-          setChallengeNote("Сорил дүүрсэн (5/5)");
-        }
+        if (res.ok && data.room) setParty(data.room as PartyRoomInfo);
       } catch {}
     },
     [playerName],
   );
-  const createChallenge = useCallback(async () => {
+  const createParty = useCallback(
+    async (kind: PartyKind) => {
+      const name = nameRef.current || playerName;
+      if (!name || name.length < 2) {
+        setNameOpen(true);
+        setPartyNote("Эхлээд нэрээ оруул");
+        return;
+      }
+      setPartyBusy(true);
+      setPartyNote("");
+      try {
+        const res = await fetch("/api/party", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hostName: name,
+            kind,
+            mode,
+            difficulty,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.room) {
+          partyAppliedRef.current = false;
+          applyParty(data.room as PartyRoomInfo);
+          setPartyNote("Room үүслээ — найзуудаа дууд");
+        } else setPartyNote("Room үүсгэж чадсангүй");
+      } catch {
+        setPartyNote("Room үүсгэж чадсангүй");
+      } finally {
+        setPartyBusy(false);
+      }
+    },
+    [playerName, mode, difficulty, applyParty],
+  );
+  const joinParty = useCallback(
+    async (code: string) => {
+      const name = nameRef.current || playerName;
+      if (!name || name.length < 2) {
+        setNameOpen(true);
+        setPartyNote("Эхлээд нэрээ оруул");
+        return;
+      }
+      setPartyBusy(true);
+      setPartyNote("");
+      try {
+        const res = await fetch("/api/party/join", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, name }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.room) {
+          partyAppliedRef.current = false;
+          applyParty(data.room as PartyRoomInfo);
+          setPartyNote("Room-д орлоо");
+        } else if (data.error === "full") setPartyNote("Room дүүрсэн");
+        else if (data.error === "started")
+          setPartyNote("Тоглолт эхэлсэн — оройтсон");
+        else setPartyNote("Room олдсонгүй");
+      } catch {
+        setPartyNote("Орж чадсангүй");
+      } finally {
+        setPartyBusy(false);
+      }
+    },
+    [playerName, applyParty],
+  );
+  const startParty = useCallback(async () => {
     const name = nameRef.current || playerName;
-    const ids = lastSetIdsRef.current;
-    const points = lastSetScoreRef.current;
-    const st = lastSetStreakRef.current;
-    if (!name || name.length < 2) {
-      setNameOpen(true);
-      setChallengeNote("Эхлээд нэрээ оруул");
-      return;
-    }
+    const code = partyCodeRef.current;
+    if (!code || !name) return;
+    const ids = pickSetIds(tracks, mode);
     if (ids.length !== 10) {
-      setChallengeNote("Эхлээд 10 дуу таагаарай");
+      setPartyNote("Дууны сан ачаалагдаагүй — түр хүлээгээд дахин оролд");
       return;
     }
-    setChallengeBusy(true);
-    setChallengeNote("");
+    setPartyBusy(true);
     try {
-      const res = await fetch("/api/challenge", {
+      const res = await fetch("/api/party/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hostName: name,
-          mode,
-          difficulty,
-          trackIds: ids,
-          score: points,
-          streak: st,
-        }),
+        body: JSON.stringify({ code, hostKey: name, trackIds: ids }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.challenge) {
-        applyChallenge(data.challenge as ChallengeInfo);
-        setChallengeOpen(true);
-        setChallengeNote("Сорил үүслээ — link хуул");
-        setBoardOpen(false);
-      } else setChallengeNote("Сорил үүсгэж чадсангүй");
+      if (res.ok && data.room) {
+        partyAppliedRef.current = false;
+        applyParty(data.room as PartyRoomInfo);
+        setPartyNote("Эхэллээ — тогло!");
+        setGameModeOpen(false);
+      } else setPartyNote("Эхлүүлж чадсангүй");
     } catch {
-      setChallengeNote("Сорил үүсгэж чадсангүй");
+      setPartyNote("Эхлүүлж чадсангүй");
     } finally {
-      setChallengeBusy(false);
+      setPartyBusy(false);
     }
-  }, [playerName, mode, difficulty, applyChallenge]);
+  }, [playerName, tracks, mode, applyParty]);
   const copyInvite = useCallback(async () => {
-    const code = challenge?.code;
+    const code = party?.code;
     if (!code) return;
     try {
       await navigator.clipboard.writeText(inviteUrl(code));
       setInviteCopied(true);
       setTimeout(() => setInviteCopied(false), 1600);
     } catch {
-      setChallengeNote(inviteUrl(code));
+      setPartyNote(inviteUrl(code));
     }
-  }, [challenge]);
+  }, [party]);
+  const leaveParty = useCallback(() => {
+    partyCodeRef.current = null;
+    partyAppliedRef.current = false;
+    setParty(null);
+    setLockedTrackIds(null);
+    setPartyNote("");
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("p");
+      url.searchParams.delete("c");
+      window.history.replaceState({}, "", url.toString());
+    } catch {}
+  }, []);
+  const setupHotSeat = useCallback((names: string[]) => {
+    setHotSeatNames(names);
+    setHotSeatTurn(0);
+    setHotSeatScores(Object.fromEntries(names.map((n) => [n, 0])));
+    setPartyNote("");
+    setGameModeOpen(false);
+    setMessage(`${names[0]}-ийн ээлж`);
+    setKind("");
+  }, []);
+  const exitHotSeat = useCallback(() => {
+    setHotSeatNames([]);
+    setHotSeatTurn(0);
+    setHotSeatScores({});
+  }, []);
   const refreshComments = useCallback(async () => {
     setCommentsBusy(true);
     try {
@@ -1255,7 +1341,7 @@ export default function SongGame() {
     [takeNext],
   );
   const load = useCallback(async () => {
-    if (!challengeReady) return;
+    if (!bootReady) return;
     if (lockedTrackIds?.length === 10) {
       await loadByTrackIds(
         lockedTrackIds,
@@ -1355,7 +1441,7 @@ export default function SongGame() {
       setLoading(false);
     }
   }, [
-    challengeReady,
+    bootReady,
     lockedTrackIds,
     loadByTrackIds,
     mode,
@@ -1366,55 +1452,88 @@ export default function SongGame() {
     let cancelled = false;
     (async () => {
       try {
-        const raw = new URLSearchParams(window.location.search)
-          .get("c")
-          ?.trim()
+        const params = new URLSearchParams(window.location.search);
+        const raw = (params.get("p") || params.get("c") || "")
+          .trim()
           .toUpperCase();
         if (raw) {
-          const res = await fetch(
-            `/api/challenge?code=${encodeURIComponent(raw)}`,
-            { cache: "no-store" },
-          );
-          if (res.ok) {
-            const data = await res.json();
-            const info = data.challenge as ChallengeInfo;
-            if (!cancelled) {
-              challengeCodeRef.current = info.code;
-              setChallenge(info);
-              setLockedTrackIds(info.trackIds);
-              setMode(info.mode === "foreign" ? "foreign" : "mongolian");
-              if (
-                info.difficulty === "easy" ||
-                info.difficulty === "medium" ||
-                info.difficulty === "hard" ||
-                info.difficulty === "expert"
-              )
-                setDifficulty(info.difficulty);
-              setChallengeOpen(true);
-              setChallengeNote(
-                info.full
-                  ? "Сорил дүүрсэн — оноо харна"
-                  : `${info.hostName}-ийн сорил · ${info.playerCount}/5`,
+          let name = "";
+          try {
+            name = cleanName(localStorage.getItem(NAME_KEY) || "");
+          } catch {}
+          if (name.length >= 2) {
+            const joinRes = await fetch("/api/party/join", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ code: raw, name }),
+            });
+            if (joinRes.ok) {
+              const data = await joinRes.json();
+              if (!cancelled && data.room) {
+                partyAppliedRef.current = false;
+                applyParty(data.room as PartyRoomInfo);
+                setGameModeOpen(true);
+                setPartyNote("Room-д орлоо");
+              }
+            } else {
+              const res = await fetch(
+                `/api/party?code=${encodeURIComponent(raw)}`,
+                { cache: "no-store" },
               );
+              if (res.ok) {
+                const data = await res.json();
+                if (!cancelled && data.room) {
+                  partyAppliedRef.current = false;
+                  applyParty(data.room as PartyRoomInfo);
+                  setGameModeOpen(true);
+                }
+              } else if (!cancelled) {
+                setPartyNote("Room олдсонгүй эсвэл дууссан");
+                setGameModeOpen(true);
+              }
             }
-          } else if (!cancelled) {
-            setChallengeNote("Сорил олдсонгүй эсвэл дууссан");
+          } else {
+            const res = await fetch(
+              `/api/party?code=${encodeURIComponent(raw)}`,
+              { cache: "no-store" },
+            );
+            if (res.ok) {
+              const data = await res.json();
+              if (!cancelled && data.room) {
+                partyAppliedRef.current = false;
+                applyParty(data.room as PartyRoomInfo);
+                setGameModeOpen(true);
+                setNameOpen(true);
+                setPartyNote("Нэрээ оруулаад room-д ор");
+              }
+            } else if (!cancelled) {
+              setPartyNote("Room олдсонгүй эсвэл дууссан");
+              setGameModeOpen(true);
+            }
           }
         }
       } catch {
       } finally {
-        if (!cancelled) setChallengeReady(true);
+        if (!cancelled) setBootReady(true);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [applyParty]);
   useEffect(() => {
-    if (!challengeReady) return;
+    if (!bootReady) return;
     const id = setTimeout(() => void load(), 0);
     return () => clearTimeout(id);
-  }, [load, challengeReady]);
+  }, [load, bootReady]);
+  useEffect(() => {
+    if (!partyCodeRef.current) return;
+    if (party?.status === "finished") return;
+    const id = setInterval(() => {
+      void refreshParty();
+    }, 2500);
+    return () => clearInterval(id);
+  }, [party?.status, party?.code, refreshParty]);
   useEffect(() => {
     if (audio.current) audio.current.volume = volume;
   }, [volume]);
@@ -1539,17 +1658,48 @@ export default function SongGame() {
     });
     const endOfSet = round >= 10;
     setTimeout(() => {
+      if (hotSeatNames.length > 0) {
+        const name = hotSeatNames[hotSeatTurn % hotSeatNames.length];
+        if (ok) {
+          const base = Math.max(20, 100 - level * 20);
+          const mult =
+            difficulty === "easy"
+              ? 0.6
+              : difficulty === "medium"
+                ? 1
+                : difficulty === "hard"
+                  ? 1.6
+                  : 2.2;
+          const pts = Math.round(base * mult);
+          setHotSeatScores((prev) => ({
+            ...prev,
+            [name]: (prev[name] || 0) + pts,
+          }));
+        }
+        const nextTurn = hotSeatTurn + 1;
+        setHotSeatTurn(nextTurn);
+        const nextName = hotSeatNames[nextTurn % hotSeatNames.length];
+        setMessage(`${nextName}-ийн ээлж`);
+        setKind("");
+      }
+      if (partyCodeRef.current) {
+        void submitPartyScore(
+          scoreRef.current,
+          streakRef.current,
+          setPlayedRef.current.length,
+        );
+      }
       if (endOfSet) {
         lastSetIdsRef.current = [...setPlayedRef.current];
         lastSetScoreRef.current = scoreRef.current;
         lastSetStreakRef.current = streakRef.current;
-        setLastSetReady(setPlayedRef.current.length === 10);
-        if (challengeCodeRef.current) {
-          void submitChallengeResult(
+        if (partyCodeRef.current) {
+          void submitPartyScore(
             scoreRef.current,
             streakRef.current,
+            10,
           );
-          setChallengeOpen(true);
+          setGameModeOpen(true);
         }
         void submitScore(false);
         setBoardOpen(true);
@@ -1856,20 +2006,6 @@ export default function SongGame() {
               <i />
               <b>{round}/10</b>
             </div>
-            {challenge && (
-              <button
-                className="board-btn hud-challenge"
-                type="button"
-                onClick={() => {
-                  setChallengeOpen(true);
-                  void refreshChallenge();
-                }}
-                title="Сорил"
-                aria-label="Сорил"
-              >
-                ⚔
-              </button>
-            )}
             <button
               className="board-btn hud-trophy"
               type="button"
@@ -1878,6 +2014,18 @@ export default function SongGame() {
               aria-label="Leaderboard"
             >
               🏆
+            </button>
+            <button
+              className="board-btn hud-challenge"
+              type="button"
+              onClick={() => {
+                setPartyNote("");
+                setGameModeOpen(true);
+              }}
+              title="Game Mode"
+              aria-label="Game Mode"
+            >
+              GM
             </button>
           </div>
         </header>
@@ -2276,8 +2424,21 @@ export default function SongGame() {
                 })}
               </div>
               {submitNote && <p className="board-note">{submitNote}</p>}
-              {challengeNote && !challengeOpen && (
-                <p className="board-note">{challengeNote}</p>
+              {hotSeatNames.length > 0 && (
+                <div className="board-list" style={{ marginTop: 8 }}>
+                  {hotSeatNames.map((n, i) => (
+                    <div
+                      key={`${n}-${i}`}
+                      className={`board-row ${i === hotSeatTurn % hotSeatNames.length ? "me" : ""}`}
+                    >
+                      <span className="board-rank">{i + 1}</span>
+                      <span className="board-name">{n}</span>
+                      <span className="board-score">
+                        {hotSeatScores[n] || 0}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
               <div className="board-actions">
                 <button
@@ -2288,29 +2449,16 @@ export default function SongGame() {
                 >
                   Шинэчлэх
                 </button>
-                {challenge ? (
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={() => {
-                      setBoardOpen(false);
-                      setChallengeOpen(true);
-                      void refreshChallenge();
-                    }}
-                  >
-                    Сорил
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={() => void createChallenge()}
-                    disabled={challengeBusy || !lastSetReady}
-                    title="Сүүлийн 10 дуугаар сорил үүсгэнэ"
-                  >
-                    Сорил үүсгэх
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => {
+                    setBoardOpen(false);
+                    setGameModeOpen(true);
+                  }}
+                >
+                  Game Mode
+                </button>
                 <button
                   type="button"
                   className="go"
@@ -2324,79 +2472,29 @@ export default function SongGame() {
           </div>
         )}
 
-        {challengeOpen && challenge && (
-          <div
-            className="board-overlay"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setChallengeOpen(false);
-            }}
-          >
-            <div className="board-card challenge-card">
-              <div className="board-head">
-                <div>
-                  <small>CHALLENGE</small>
-                  <strong>
-                    {challenge.hostName}-ийн сорил · {challenge.playerCount}/5
-                  </strong>
-                </div>
-                <button
-                  type="button"
-                  className="board-close"
-                  onClick={() => setChallengeOpen(false)}
-                  aria-label="Хаах"
-                >
-                  ×
-                </button>
-              </div>
-              <p className="board-meta">
-                {diffLabel[challenge.difficulty as Difficulty] ||
-                  challenge.difficulty}{" "}
-                · {challenge.mode === "foreign" ? "Гадаад" : "Монгол"} · код{" "}
-                {challenge.code}
-              </p>
-              <div className="board-list">
-                {challenge.results.length === 0 && (
-                  <p className="board-empty">
-                    Одоогоор хоосон. 10 дуу таагаад оноо орно.
-                  </p>
-                )}
-                {challenge.results.map((e, i) => (
-                  <div
-                    key={e.id || `${e.name}-${i}`}
-                    className={`board-row ${playerName && e.name.toLowerCase() === playerName.toLowerCase() ? "me" : ""}`}
-                  >
-                    <span className="board-rank">{i + 1}</span>
-                    <span className="board-name">{e.name}</span>
-                    <span className="board-score">{e.score}</span>
-                  </div>
-                ))}
-              </div>
-              {challengeNote && <p className="board-note">{challengeNote}</p>}
-              {challenge.full && (
-                <p className="board-meta">Сорил дүүрсэн (5/5)</p>
-              )}
-              <div className="board-actions">
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => void refreshChallenge()}
-                  disabled={challengeBusy}
-                >
-                  Шинэчлэх
-                </button>
-                <button
-                  type="button"
-                  className="go"
-                  onClick={() => void copyInvite()}
-                >
-                  {inviteCopied ? "Хуулсан!" : "Link хуулах"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <GameModePanel
+          open={gameModeOpen}
+          onClose={() => setGameModeOpen(false)}
+          playerName={playerName}
+          mode={mode}
+          difficulty={difficulty}
+          room={party}
+          isHost={isPartyHost}
+          busy={partyBusy}
+          note={partyNote}
+          inviteCopied={inviteCopied}
+          onPickMode={(_id: GameModeId) => setPartyNote("")}
+          onCreateParty={(kind) => void createParty(kind)}
+          onJoinParty={(code) => void joinParty(code)}
+          onStartParty={() => void startParty()}
+          onCopyInvite={() => void copyInvite()}
+          onRefresh={() => void refreshParty()}
+          onLeave={leaveParty}
+          hotSeatNames={hotSeatNames}
+          hotSeatTurn={hotSeatTurn}
+          onHotSeatSetup={setupHotSeat}
+          onHotSeatExit={exitHotSeat}
+        />
 
         {(settingsOpen || commentsOpen) && (
           <button

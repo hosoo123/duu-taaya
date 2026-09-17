@@ -63,3 +63,40 @@ model ChallengeResult {
   @@unique([challengeId, nameKey])
   @@index([challengeId, score(sort: Desc)])
 }
+
+/** Live multiplayer lobby / party */
+model PartyRoom {
+  id           String        @id @default(cuid())
+  code         String        @unique
+  kind         String        @default("party") // party | duel | streak
+  mode         String
+  difficulty   String
+  status       String        @default("lobby") // lobby | playing | finished
+  trackIds     Int[]         @default([])
+  hostKey      String
+  hostName     String
+  maxPlayers   Int           @default(8)
+  sharedStreak Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  expiresAt    DateTime
+  players      PartyPlayer[]
+
+  @@index([createdAt(sort: Desc)])
+}
+
+model PartyPlayer {
+  id         String    @id @default(cuid())
+  roomId     String
+  room       PartyRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  name       String
+  nameKey    String
+  score      Int       @default(0)
+  streak     Int       @default(0)
+  roundsDone Int       @default(0)
+  ready      Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([roomId, nameKey])
+  @@index([roomId, score(sort: Desc)])
+}

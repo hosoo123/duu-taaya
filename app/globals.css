@@ -139,10 +139,80 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   border-radius: 14px;
   background: linear-gradient(145deg, #1a2228, #100e12);
   box-shadow: inset 0 0 0 1px #6ec8ff33, 0 8px 20px #6ec8ff18;
-  font-size: 16px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
-.challenge-card .board-meta {
+.challenge-card .board-meta,
+.game-mode-card .board-meta {
   word-break: break-word;
+}
+.game-mode-grid {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+.game-mode-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 14px 14px 12px;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #1a141c, #100c12);
+  box-shadow: inset 0 0 0 1px #ffffff10;
+  color: #f2e9ef;
+  text-align: left;
+  cursor: pointer;
+}
+.game-mode-tile:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: inset 0 0 0 1px #6ec8ff44;
+}
+.game-mode-tile:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.game-mode-tile strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+.game-mode-tile > span:last-child {
+  color: var(--mute);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.game-mode-tag {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #6ec8ff22;
+  color: #9fd9ff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.game-mode-input {
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: #120d14;
+  color: #f2e9ef;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: inset 0 0 0 1px #ffffff14;
+}
+.game-mode-area {
+  letter-spacing: 0;
+  font-weight: 600;
+  resize: vertical;
+  min-height: 96px;
 }
 .name-chip {
   max-width: 96px;
