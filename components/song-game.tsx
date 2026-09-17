@@ -532,11 +532,15 @@ export default function SongGame() {
     lastSetStreakRef = useRef(0),
     partyCodeRef = useRef<string | null>(null),
     partyAppliedRef = useRef(false),
+    partyJoinAttemptRef = useRef<string | null>(null),
     limits = difficultyLimits[difficulty];
   const isPartyHost =
     !!party &&
     !!playerName &&
     playerName.toLowerCase() === party.hostKey;
+  const partyAuthed = clerkEnabled
+    ? clerkSignedIn
+    : playerName.trim().length >= 2;
   useEffect(() => {
     scoreRef.current = score;
   }, [score]);
@@ -802,6 +806,10 @@ export default function SongGame() {
   );
   const createParty = useCallback(
     async (kind: PartyKind) => {
+      if (clerkEnabled && !clerkSignedIn) {
+        setPartyNote("Game Mode-д нэвтрэх хэрэгтэй");
+        return;
+      }
       const name = nameRef.current || playerName;
       if (!name || name.length < 2) {
         setNameOpen(true);
@@ -833,10 +841,14 @@ export default function SongGame() {
         setPartyBusy(false);
       }
     },
-    [playerName, mode, difficulty, applyParty],
+    [playerName, mode, difficulty, applyParty, clerkSignedIn],
   );
   const joinParty = useCallback(
     async (code: string) => {
+      if (clerkEnabled && !clerkSignedIn) {
+        setPartyNote("Game Mode-д нэвтрэх хэрэгтэй");
+        return;
+      }
       const name = nameRef.current || playerName;
       if (!name || name.length < 2) {
         setNameOpen(true);
@@ -866,7 +878,7 @@ export default function SongGame() {
         setPartyBusy(false);
       }
     },
-    [playerName, applyParty],
+    [playerName, applyParty, clerkSignedIn],
   );
   const startParty = useCallback(async () => {
     const name = nameRef.current || playerName;
@@ -915,6 +927,7 @@ export default function SongGame() {
   const leaveParty = useCallback(() => {
     partyCodeRef.current = null;
     partyAppliedRef.current = false;
+    partyJoinAttemptRef.current = null;
     setParty(null);
     setLockedTrackIds(null);
     setPartyNote("");
@@ -925,15 +938,22 @@ export default function SongGame() {
       window.history.replaceState({}, "", url.toString());
     } catch {}
   }, []);
-  const setupHotSeat = useCallback((names: string[]) => {
-    setHotSeatNames(names);
-    setHotSeatTurn(0);
-    setHotSeatScores(Object.fromEntries(names.map((n) => [n, 0])));
-    setPartyNote("");
-    setGameModeOpen(false);
-    setMessage(`${names[0]}-ийн ээлж`);
-    setKind("");
-  }, []);
+  const setupHotSeat = useCallback(
+    (names: string[]) => {
+      if (clerkEnabled && !clerkSignedIn) {
+        setPartyNote("Game Mode-д нэвтрэх хэрэгтэй");
+        return;
+      }
+      setHotSeatNames(names);
+      setHotSeatTurn(0);
+      setHotSeatScores(Object.fromEntries(names.map((n) => [n, 0])));
+      setPartyNote("");
+      setGameModeOpen(false);
+      setMessage(`${names[0]}-ийн ээлж`);
+      setKind("");
+    },
+    [clerkSignedIn],
+  );
   const exitHotSeat = useCallback(() => {
     setHotSeatNames([]);
     setHotSeatTurn(0);
@@ -1481,59 +1501,26 @@ export default function SongGame() {
           .trim()
           .toUpperCase();
         if (raw) {
-          let name = "";
-          try {
-            name = cleanName(localStorage.getItem(NAME_KEY) || "");
-          } catch {}
-          if (name.length >= 2) {
-            const joinRes = await fetch("/api/party/join", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ code: raw, name }),
-            });
-            if (joinRes.ok) {
-              const data = await joinRes.json();
-              if (!cancelled && data.room) {
-                partyAppliedRef.current = false;
-                applyParty(data.room as PartyRoomInfo);
-                setGameModeOpen(true);
-                setPartyNote("Room-д орлоо");
-              }
-            } else {
-              const res = await fetch(
-                `/api/party?code=${encodeURIComponent(raw)}`,
-                { cache: "no-store" },
-              );
-              if (res.ok) {
-                const data = await res.json();
-                if (!cancelled && data.room) {
-                  partyAppliedRef.current = false;
-                  applyParty(data.room as PartyRoomInfo);
-                  setGameModeOpen(true);
-                }
-              } else if (!cancelled) {
-                setPartyNote("Room олдсонгүй эсвэл дууссан");
-                setGameModeOpen(true);
-              }
-            }
-          } else {
-            const res = await fetch(
-              `/api/party?code=${encodeURIComponent(raw)}`,
-              { cache: "no-store" },
-            );
-            if (res.ok) {
-              const data = await res.json();
-              if (!cancelled && data.room) {
-                partyAppliedRef.current = false;
-                applyParty(data.room as PartyRoomInfo);
-                setGameModeOpen(true);
-                setNameOpen(true);
-                setPartyNote("Нэрээ оруулаад room-д ор");
-              }
-            } else if (!cancelled) {
-              setPartyNote("Room олдсонгүй эсвэл дууссан");
+          // Invite link: room харуулна, join нь нэвтэрсний дараа
+          const res = await fetch(
+            `/api/party?code=${encodeURIComponent(raw)}`,
+            { cache: "no-store" },
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (!cancelled && data.room) {
+              partyCodeRef.current = raw;
+              setParty(data.room as PartyRoomInfo);
               setGameModeOpen(true);
+              setPartyNote(
+                clerkEnabled
+                  ? "Нэвтэрээд room-д орно уу"
+                  : "Нэрээ оруулаад room-д ор",
+              );
             }
+          } else if (!cancelled) {
+            setPartyNote("Room олдсонгүй эсвэл дууссан");
+            setGameModeOpen(true);
           }
         }
       } catch {
@@ -1544,7 +1531,29 @@ export default function SongGame() {
     return () => {
       cancelled = true;
     };
-  }, [applyParty]);
+  }, []);
+  useEffect(() => {
+    if (!bootReady || !partyAuthed) return;
+    const name = nameRef.current || playerName;
+    if (!name || name.length < 2) return;
+    const code = partyCodeRef.current;
+    if (!code) return;
+    if (party?.players.some((p) => p.name.toLowerCase() === name.toLowerCase()))
+      return;
+    if (party && party.status !== "lobby") return;
+    const attemptKey = `${code}|${name.toLowerCase()}`;
+    if (partyJoinAttemptRef.current === attemptKey) return;
+    partyJoinAttemptRef.current = attemptKey;
+    void joinParty(code);
+  }, [
+    bootReady,
+    partyAuthed,
+    playerName,
+    party?.code,
+    party?.status,
+    party?.players,
+    joinParty,
+  ]);
   useEffect(() => {
     if (!bootReady) return;
     const id = setTimeout(() => void load(), 0);
@@ -2500,6 +2509,8 @@ export default function SongGame() {
           open={gameModeOpen}
           onClose={() => setGameModeOpen(false)}
           playerName={playerName}
+          signedIn={clerkSignedIn}
+          clerkOn={clerkEnabled}
           mode={mode}
           difficulty={difficulty}
           room={party}

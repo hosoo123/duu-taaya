@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SignInButton } from "@clerk/nextjs";
 import type { Difficulty, Mode } from "@/data/catalog";
 import type { PartyKind, PartyRoomInfo } from "@/lib/party";
 
@@ -10,6 +11,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   playerName: string;
+  signedIn: boolean;
+  clerkOn: boolean;
   mode: Mode;
   difficulty: Difficulty;
   room: PartyRoomInfo | null;
@@ -72,6 +75,8 @@ export function GameModePanel({
   open,
   onClose,
   playerName,
+  signedIn,
+  clerkOn,
   mode,
   difficulty,
   room,
@@ -94,6 +99,8 @@ export function GameModePanel({
   const [view, setView] = useState<"menu" | "join" | "hotseat-setup">("menu");
   const [joinCode, setJoinCode] = useState("");
   const [seatDraft, setSeatDraft] = useState("Чи\nНайз");
+
+  const canPlay = clerkOn ? signedIn : playerName.trim().length >= 2;
 
   useEffect(() => {
     if (!open) {
@@ -139,7 +146,26 @@ export function GameModePanel({
           </button>
         </div>
 
-        {room ? (
+        {!canPlay ? (
+          <div className="gm-auth-gate">
+            <p className="gm-auth-title">Нэвтрэх хэрэгтэй</p>
+            <p className="board-meta">
+              {room
+                ? `Room ${room.code} · нэвтэрээд орно уув`
+                : "Game Mode тоглохын тулд бүртгэлээр нэвтэрнэ үү."}
+            </p>
+            {clerkOn ? (
+              <SignInButton mode="modal">
+                <button type="button" className="go gm-auth-btn">
+                  Нэвтрэх
+                </button>
+              </SignInButton>
+            ) : (
+              <p className="board-note">Clerk тохируулаагүй байна</p>
+            )}
+            {note && <p className="board-note">{note}</p>}
+          </div>
+        ) : room ? (
           <>
             <div className="gm-code-row">
               <div className="gm-code">
@@ -243,7 +269,9 @@ export function GameModePanel({
               className="gm-input"
               value={joinCode}
               onChange={(e) =>
-                setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+                setJoinCode(
+                  e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+                )
               }
               placeholder="ABC123"
               maxLength={8}
@@ -309,7 +337,7 @@ export function GameModePanel({
           <>
             <p className="board-meta">
               {mode === "foreign" ? "Гадаад" : "Монгол"} · {difficulty}
-              {!playerName ? " · нэрээ оруул" : ""}
+              {playerName ? ` · ${playerName}` : ""}
             </p>
             <div className="gm-grid">
               {MODES.map((m) => (
@@ -317,7 +345,7 @@ export function GameModePanel({
                   key={m.id}
                   type="button"
                   className={`gm-tile${m.id === "party" ? " featured" : ""}`}
-                  disabled={busy || (!playerName && m.id !== "hotseat")}
+                  disabled={busy}
                   onClick={() => {
                     onPickMode(m.id);
                     if (m.id === "hotseat") setView("hotseat-setup");
@@ -336,7 +364,6 @@ export function GameModePanel({
                 type="button"
                 className="ghost gm-join-btn"
                 onClick={() => setView("join")}
-                disabled={!playerName}
               >
                 Кодоор орох
               </button>

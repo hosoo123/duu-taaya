@@ -303,6 +303,22 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .gm-join-btn {
   flex: 1;
 }
+.gm-auth-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 0 4px;
+}
+.gm-auth-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+}
+.gm-auth-btn {
+  width: 100%;
+  height: 48px;
+}
 .name-chip {
   max-width: 96px;
   padding: 6px 8px;
