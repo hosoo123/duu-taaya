@@ -170,7 +170,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .auth-rail {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
   align-items: stretch;
 }
@@ -184,12 +184,43 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   max-width: none;
   text-align: center;
 }
+.auth-signin {
+  width: 100%;
+  padding: 10px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: linear-gradient(145deg, #ff2f55, #c9183a);
+  box-shadow: 0 8px 18px #ff2f5533, inset 0 0 0 1px #ff6a8444;
+  transition: filter 0.15s, transform 0.15s;
+}
+.auth-signin:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
 .auth-clerk {
   width: 100%;
+}
+.auth-hint {
+  margin: 0 !important;
+  text-align: center;
+  font-size: 11px !important;
 }
 .auth-or {
   margin: 0 !important;
   text-align: center;
+}
+.clerk-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse 70% 45% at 50% -5%, #4a1528 0%, transparent 55%),
+    radial-gradient(ellipse 40% 35% at 0% 100%, #1a1028 0%, transparent 50%),
+    #050308;
 }
 .name-chip:hover { color: #fff; }
 

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { SignInButton, Show, UserButton } from "@clerk/nextjs";
 import {
   animeRomajiByCanon,
   animeRomajiDisplay,
@@ -1732,15 +1732,10 @@ export default function SongGame() {
             <Show when="signed-out">
               <div className="auth-rail">
                 <SignInButton mode="modal">
-                  <button type="button" className="name-chip auth-mini">
+                  <button type="button" className="auth-signin">
                     Нэвтрэх
                   </button>
                 </SignInButton>
-                <SignUpButton mode="modal">
-                  <button type="button" className="name-chip auth-mini">
-                    Бүртгүүлэх
-                  </button>
-                </SignUpButton>
                 <button
                   className="name-chip"
                   type="button"
@@ -2128,11 +2123,9 @@ export default function SongGame() {
                       Нэвтрэх
                     </button>
                   </SignInButton>
-                  <SignUpButton mode="modal">
-                    <button type="button" className="ghost auth-clerk">
-                      Бүртгүүлэх
-                    </button>
-                  </SignUpButton>
+                  <p className="board-meta auth-hint">
+                    Шинэ хэрэглэгч бол нэвтрэх цонхноос Sign up дар
+                  </p>
                 </div>
               )}
               <p className="board-meta auth-or">
