@@ -8,17 +8,20 @@ const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
   "https://duutaay.xyz";
 
-const MIN_MNT = 1000;
-const MAX_MNT = 500_000;
+const MIN_MNT = 1;
+const MAX_MNT = 1_000_000;
 
 function operatorsForKey(apiKey: string) {
   const fromEnv = (process.env.WIRE_ALLOWED_OPERATORS || "")
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
-  if (fromEnv.length) return fromEnv;
   if (apiKey.startsWith("sk_test_")) return ["sandbox"];
-  return [];
+
+  // This project currently has QPay enabled. Wire accepts only operators
+  // connected to the project, so never forward stale or duplicate env values.
+  if (fromEnv.includes("qpay")) return ["qpay"];
+  return ["qpay"];
 }
 
 export async function POST(req: NextRequest) {
@@ -46,16 +49,6 @@ export async function POST(req: NextRequest) {
   }
 
   const operators = operatorsForKey(apiKey);
-  if (!operators.length) {
-    return NextResponse.json(
-      {
-        error:
-          "WIRE_ALLOWED_OPERATORS тохируулна уу (жишээ: qpay,socialpay)",
-      },
-      { status: 503 },
-    );
-  }
-
   // Wire: 50000 minor = 500.00 MNT
   const amountMinor = amountMnt * 100;
   const wire = new Wire(apiKey);
