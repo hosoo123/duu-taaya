@@ -1589,13 +1589,24 @@ export default function SongGame() {
     (async () => {
       try {
         const params = new URLSearchParams(window.location.search);
-        if (params.get("donated") === "1") {
-          setMessage("Баярлалаа — дэмжлэг хүлээн авлаа!");
+        const payment = params.get("payment");
+        if (payment === "success" || params.get("donated") === "1") {
+          setMessage("Төлбөр амжилттай. Дуугаа Таа-г дэмжсэнд баярлалаа!");
           setKind("good");
           try {
             const url = new URL(window.location.href);
             url.searchParams.delete("donated");
             url.searchParams.delete("donate");
+            url.searchParams.delete("payment");
+            window.history.replaceState({}, "", url.toString());
+          } catch {}
+        } else if (payment === "cancelled" || params.get("donate") === "cancel") {
+          setMessage("Төлбөр цуцлагдлаа. Хүсвэл дахин оролдоорой.");
+          setKind("bad");
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("donate");
+            url.searchParams.delete("payment");
             window.history.replaceState({}, "", url.toString());
           } catch {}
         }

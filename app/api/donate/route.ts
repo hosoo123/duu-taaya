@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
   const operators = operatorsForKey(apiKey);
   const wire = new Wire(apiKey);
   const donateId = crypto.randomUUID();
-  // Wire dashboard: «Утга» = description (docs: гүйлгээний утга)
-  const description = `Дуугаа Таа · дэмжлэг · ${amountMnt.toLocaleString("mn-MN")}₮`;
+  // Wire «Утга» / checkout дээр харагдах нэр
+  const description = "Хандивын мөнгө";
 
   try {
     // TS SDK type-д description байхгүй ч API/docs дэмждэг
@@ -64,8 +64,8 @@ export async function POST(req: NextRequest) {
         allowed_operators: operators,
         metadata: {
           purpose: "donation",
-          product: "Дуугаа Таа дэмжлэг",
-          product_and_service_type: "Дэмжлэг / Donation",
+          product: "donation",
+          product_and_service_type: "donation",
           app: "duu-taaya",
           amount_mnt: String(amountMnt),
         },
@@ -80,8 +80,9 @@ export async function POST(req: NextRequest) {
     }>("POST", "/v1/checkout/sessions", {
       body: {
         payment_intent: pi.id,
-        success_url: `${SITE_URL}/?donated=1`,
-        cancel_url: `${SITE_URL}/?donate=cancel`,
+        // DeadLock шиг буцах холбоос — Wire dashboard default-тай нийцнэ
+        success_url: `${SITE_URL}/?payment=success`,
+        cancel_url: `${SITE_URL}/?payment=cancelled`,
       },
       idempotencyKey: `donate-cs-${donateId}`,
     });
