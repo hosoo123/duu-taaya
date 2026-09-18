@@ -21,6 +21,7 @@ export type PartyRoomInfo = {
   code: string;
   kind: PartyKind;
   mode: string;
+  genre: string;
   difficulty: string;
   status: "lobby" | "playing" | "finished";
   trackIds: number[];
@@ -49,6 +50,7 @@ export function serializeParty(row: {
   code: string;
   kind: string;
   mode: string;
+  genre?: string | null;
   difficulty: string;
   status: string;
   trackIds: number[];
@@ -95,6 +97,7 @@ export function serializeParty(row: {
     code: row.code,
     kind,
     mode: row.mode,
+    genre: row.genre || "all",
     difficulty: row.difficulty,
     status,
     trackIds: row.trackIds,

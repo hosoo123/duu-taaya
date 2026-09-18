@@ -26,6 +26,30 @@ export async function POST(req: NextRequest) {
         ),
       ].slice(0, 10)
     : [];
+  const DIFFS = ["easy", "medium", "hard", "expert"] as const;
+  const GENRES = [
+    "all",
+    "new",
+    "hiphop",
+    "pop",
+    "rock",
+    "traditional",
+    "anime",
+    "jpop",
+    "nineties",
+    "twoThousands",
+  ] as const;
+  const modeRaw = String(data?.mode || "").slice(0, 20);
+  const mode =
+    modeRaw === "foreign" || modeRaw === "mongolian" ? modeRaw : null;
+  const difficultyRaw = String(data?.difficulty || "").slice(0, 20);
+  const difficulty = (DIFFS as readonly string[]).includes(difficultyRaw)
+    ? difficultyRaw
+    : null;
+  const genreRaw = String(data?.genre || "").slice(0, 20);
+  const genre = (GENRES as readonly string[]).includes(genreRaw)
+    ? genreRaw
+    : null;
   if (!code || !hostKey)
     return NextResponse.json({ error: "code" }, { status: 400 });
   if (trackIds.length !== 10)
@@ -47,6 +71,9 @@ export async function POST(req: NextRequest) {
         data: {
           status: "playing",
           trackIds,
+          ...(mode ? { mode } : {}),
+          ...(genre ? { genre } : {}),
+          ...(difficulty ? { difficulty } : {}),
         },
         include: { players: true },
       });

@@ -269,6 +269,62 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .gm-winner {
   margin: 0.35rem 0 0.15rem;
 }
+.gm-lobby-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #100c12;
+  box-shadow: inset 0 0 0 1px #ffffff10;
+}
+.gm-setting-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gm-setting-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.gm-chip-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.gm-chip-row::-webkit-scrollbar {
+  display: none;
+}
+.gm-chip-wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.gm-chip {
+  flex: 0 0 auto;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #1a141c;
+  color: var(--mute);
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #ffffff10;
+}
+.gm-chip.on {
+  color: var(--ink);
+  background: linear-gradient(180deg, #ff6a84, var(--accent));
+  box-shadow: none;
+}
+.gm-chip:disabled:not(.on) {
+  opacity: 0.55;
+}
 .gm-input {
   width: 100%;
   padding: 14px 16px;

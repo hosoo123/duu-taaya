@@ -2,10 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { SignInButton } from "@clerk/nextjs";
-import type { Difficulty, Mode } from "@/data/catalog";
+import type { Difficulty, Genre, Mode } from "@/data/catalog";
 import type { PartyKind, PartyRoomInfo } from "@/lib/party";
 
 export type GameModeId = "party" | "duel" | "streak" | "hotseat";
+
+export type PartyLobbySettings = {
+  mode: Mode;
+  genre: Genre;
+  difficulty: Difficulty;
+};
 
 type Props = {
   open: boolean;
@@ -14,6 +20,7 @@ type Props = {
   signedIn: boolean;
   clerkOn: boolean;
   mode: Mode;
+  genre: Genre;
   difficulty: Difficulty;
   room: PartyRoomInfo | null;
   isHost: boolean;
@@ -27,6 +34,7 @@ type Props = {
   onCopyInvite: () => void;
   onRefresh: () => void;
   onLeave: () => void;
+  onLobbySettings: (next: PartyLobbySettings) => void;
   hotSeatNames: string[];
   hotSeatTurn: number;
   hotSeatScores?: Record<string, number>;
@@ -66,11 +74,60 @@ const MODES: {
   },
 ];
 
+const DIFFS: Difficulty[] = ["easy", "medium", "hard", "expert"];
+const DIFF_LABEL: Record<Difficulty, string> = {
+  easy: "Easy",
+  medium: "Med",
+  hard: "Hard",
+  expert: "Pro",
+};
+
+const GENRE_MN: Genre[] = [
+  "all",
+  "new",
+  "hiphop",
+  "pop",
+  "rock",
+  "traditional",
+];
+const GENRE_FR: Genre[] = [
+  "all",
+  "new",
+  "hiphop",
+  "pop",
+  "rock",
+  "anime",
+  "jpop",
+  "nineties",
+  "twoThousands",
+];
+const GENRE_LABEL: Record<Genre, string> = {
+  all: "Бүгд",
+  new: "Шинэ",
+  hiphop: "Hip-Hop",
+  pop: "Pop",
+  rock: "Rock",
+  traditional: "Зохиол",
+  anime: "Anime",
+  jpop: "J-pop",
+  nineties: "90s",
+  twoThousands: "2000s",
+};
+
 const statusLabel = (s: PartyRoomInfo["status"]) =>
   s === "lobby" ? "Lobby" : s === "finished" ? "Дууссан" : "Тоглож байна";
 
 const kindLabel = (kind: PartyRoomInfo["kind"]) =>
   kind === "duel" ? "1v1" : kind === "streak" ? "Streak" : "Party";
+
+const asMode = (s: string): Mode =>
+  s === "foreign" ? "foreign" : "mongolian";
+const asDifficulty = (s: string): Difficulty =>
+  DIFFS.includes(s as Difficulty) ? (s as Difficulty) : "medium";
+const asGenre = (s: string, mode: Mode): Genre => {
+  const list = mode === "mongolian" ? GENRE_MN : GENRE_FR;
+  return list.includes(s as Genre) ? (s as Genre) : "all";
+};
 
 export function GameModePanel({
   open,
@@ -79,6 +136,7 @@ export function GameModePanel({
   signedIn,
   clerkOn,
   mode,
+  genre,
   difficulty,
   room,
   isHost,
@@ -92,6 +150,7 @@ export function GameModePanel({
   onCopyInvite,
   onRefresh,
   onLeave,
+  onLobbySettings,
   hotSeatNames,
   hotSeatTurn,
   hotSeatScores = {},
@@ -122,6 +181,18 @@ export function GameModePanel({
         : view === "hotseat-setup"
           ? "Hot Seat"
           : "Хамт тоглох";
+
+  const lobbyMode = room ? asMode(room.mode) : mode;
+  const lobbyDiff = room ? asDifficulty(room.difficulty) : difficulty;
+  const lobbyGenre = room ? asGenre(room.genre || "all", lobbyMode) : genre;
+  const genreOptions = lobbyMode === "mongolian" ? GENRE_MN : GENRE_FR;
+
+  const pushSettings = (next: Partial<PartyLobbySettings>) => {
+    const m = next.mode ?? lobbyMode;
+    const g = asGenre(next.genre ?? lobbyGenre, m);
+    const d = next.difficulty ?? lobbyDiff;
+    onLobbySettings({ mode: m, genre: g, difficulty: d });
+  };
 
   return (
     <div
@@ -182,6 +253,75 @@ export function GameModePanel({
                 </span>
               </div>
             </div>
+
+            {room.status === "lobby" && (
+              <div className="gm-lobby-settings">
+                <div className="gm-setting-block">
+                  <span className="gm-setting-label">Горим</span>
+                  <div className="gm-chip-row">
+                    {(
+                      [
+                        ["mongolian", "Монгол"],
+                        ["foreign", "Гадаад"],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`gm-chip${lobbyMode === id ? " on" : ""}`}
+                        disabled={!isHost || busy}
+                        onClick={() => pushSettings({ mode: id, genre: "all" })}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="gm-setting-block">
+                  <span className="gm-setting-label">Түвшин</span>
+                  <div className="gm-chip-row">
+                    {DIFFS.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        className={`gm-chip${lobbyDiff === d ? " on" : ""}`}
+                        disabled={!isHost || busy}
+                        onClick={() => pushSettings({ difficulty: d })}
+                      >
+                        {DIFF_LABEL[d]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="gm-setting-block">
+                  <span className="gm-setting-label">Жанр</span>
+                  <div className="gm-chip-row gm-chip-wrap">
+                    {genreOptions.map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        className={`gm-chip${lobbyGenre === g ? " on" : ""}`}
+                        disabled={!isHost || busy}
+                        onClick={() => pushSettings({ genre: g })}
+                      >
+                        {GENRE_LABEL[g]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {!isHost && (
+                  <p className="board-meta">Host тохиргоо сонгоно</p>
+                )}
+              </div>
+            )}
+
+            {room.status !== "lobby" && (
+              <p className="board-meta">
+                {lobbyMode === "foreign" ? "Гадаад" : "Монгол"} ·{" "}
+                {GENRE_LABEL[lobbyGenre]} · {DIFF_LABEL[lobbyDiff]}
+              </p>
+            )}
+
             {room.status === "finished" && room.players[0] && (
               <p className="board-meta gm-winner">
                 Ялагч: <b>{room.players[0].name}</b> · {room.players[0].score}{" "}
@@ -191,9 +331,7 @@ export function GameModePanel({
             {room.kind === "streak" && room.status === "playing" && (
               <p className="board-meta">
                 Shared streak · одоогийн хамгийн өндөр:{" "}
-                <b>
-                  {Math.max(0, ...room.players.map((p) => p.streak))}
-                </b>
+                <b>{Math.max(0, ...room.players.map((p) => p.streak))}</b>
               </p>
             )}
             <div className="board-list gm-list">
@@ -373,7 +511,8 @@ export function GameModePanel({
         ) : (
           <>
             <p className="board-meta">
-              {mode === "foreign" ? "Гадаад" : "Монгол"} · {difficulty}
+              {mode === "foreign" ? "Гадаад" : "Монгол"} ·{" "}
+              {GENRE_LABEL[genre]} · {DIFF_LABEL[difficulty]}
               {playerName ? ` · ${playerName}` : ""}
             </p>
             <div className="gm-grid">

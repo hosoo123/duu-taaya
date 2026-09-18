@@ -70,6 +70,7 @@ model PartyRoom {
   code         String        @unique
   kind         String        @default("party") // party | duel | streak
   mode         String
+  genre        String        @default("all")
   difficulty   String
   status       String        @default("lobby") // lobby | playing | finished
   trackIds     Int[]         @default([])

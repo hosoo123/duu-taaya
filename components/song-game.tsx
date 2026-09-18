@@ -733,16 +733,27 @@ export default function SongGame() {
     const me = meName
       ? info.players.find((p) => p.name.toLowerCase() === meName)
       : undefined;
-    if (!soft) {
-      setMode(info.mode === "foreign" ? "foreign" : "mongolian");
-      if (
-        info.difficulty === "easy" ||
-        info.difficulty === "medium" ||
-        info.difficulty === "hard" ||
-        info.difficulty === "expert"
-      )
-        setDifficulty(info.difficulty);
-    }
+    const nextMode: Mode =
+      info.mode === "foreign" ? "foreign" : "mongolian";
+    const nextDiff =
+      info.difficulty === "easy" ||
+      info.difficulty === "medium" ||
+      info.difficulty === "hard" ||
+      info.difficulty === "expert"
+        ? info.difficulty
+        : null;
+    const genreRaw = (info.genre || "all") as Genre;
+    const allowed =
+      nextMode === "mongolian"
+        ? !["anime", "jpop", "nineties", "twoThousands"].includes(genreRaw)
+        : genreRaw !== "traditional";
+    const nextGenre: Genre = allowed ? genreRaw : "all";
+
+    // Lobby/settings + start үед бүгд sync (soft ч гэсэн)
+    setMode(nextMode);
+    if (nextDiff) setDifficulty(nextDiff);
+    setGenre(nextGenre);
+
     // Зөвхөн гишүүнд track lock — зочин mid-game soft poll-оор lock хийхгүй
     if (info.status !== "lobby" && info.trackIds.length >= 8 && me) {
       setLockedTrackIds((prev) => {
@@ -835,6 +846,7 @@ export default function SongGame() {
             hostName: name,
             kind,
             mode,
+            genre,
             difficulty,
           }),
         });
@@ -850,7 +862,41 @@ export default function SongGame() {
         setPartyBusy(false);
       }
     },
-    [playerName, mode, difficulty, applyParty, clerkSignedIn],
+    [playerName, mode, genre, difficulty, applyParty, clerkSignedIn],
+  );
+  const updateLobbySettings = useCallback(
+    async (next: { mode: Mode; genre: Genre; difficulty: Difficulty }) => {
+      const code = partyCodeRef.current;
+      const name = nameRef.current || playerName;
+      if (!code || !name) return;
+      setMode(next.mode);
+      setGenre(next.genre);
+      setDifficulty(next.difficulty);
+      setPartyBusy(true);
+      try {
+        const res = await fetch("/api/party", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            hostKey: name,
+            mode: next.mode,
+            genre: next.genre,
+            difficulty: next.difficulty,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.room) {
+          applyParty(data.room as PartyRoomInfo, { soft: true });
+          setPartyNote("Тохиргоо хадгаллаа");
+        } else setPartyNote("Тохиргоо хадгалж чадсангүй");
+      } catch {
+        setPartyNote("Тохиргоо хадгалж чадсангүй");
+      } finally {
+        setPartyBusy(false);
+      }
+    },
+    [playerName, applyParty],
   );
   const joinParty = useCallback(
     async (code: string) => {
@@ -913,7 +959,14 @@ export default function SongGame() {
       const res = await fetch("/api/party/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, hostKey: name, trackIds: ids }),
+        body: JSON.stringify({
+          code,
+          hostKey: name,
+          trackIds: ids,
+          mode,
+          genre,
+          difficulty,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.room) {
@@ -927,7 +980,7 @@ export default function SongGame() {
     } finally {
       setPartyBusy(false);
     }
-  }, [playerName, tracks, mode, applyParty]);
+  }, [playerName, tracks, mode, genre, difficulty, applyParty]);
   const copyInvite = useCallback(async () => {
     const code = party?.code;
     if (!code) return;
@@ -2564,6 +2617,7 @@ export default function SongGame() {
           signedIn={clerkSignedIn}
           clerkOn={clerkEnabled}
           mode={mode}
+          genre={genre}
           difficulty={difficulty}
           room={party}
           isHost={isPartyHost}
@@ -2577,6 +2631,7 @@ export default function SongGame() {
           onCopyInvite={() => void copyInvite()}
           onRefresh={() => void refreshParty()}
           onLeave={leaveParty}
+          onLobbySettings={(next) => void updateLobbySettings(next)}
           hotSeatNames={hotSeatNames}
           hotSeatTurn={hotSeatTurn}
           hotSeatScores={hotSeatScores}
