@@ -2196,6 +2196,16 @@ export default function SongGame() {
         >
           ↻
         </button>
+        <a
+          className="created-by"
+          href="https://www.instagram.com/m.hosoo/"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Instagram — @m.hosoo"
+        >
+          Created by
+          <span>@m.hosoo</span>
+        </a>
       </aside>
 
       <section className="stage">
@@ -2767,6 +2777,14 @@ export default function SongGame() {
                 {volCtrl(false, "music")}
                 {volCtrl(false, "sfx")}
               </div>
+              <a
+                className="created-by created-by-settings"
+                href="https://www.instagram.com/m.hosoo/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Created by <span>@m.hosoo</span>
+              </a>
             </div>
           )}
           {commentsOpen && (
