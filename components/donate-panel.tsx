@@ -17,16 +17,11 @@ export function DonatePanel({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  const staticUrl = process.env.NEXT_PUBLIC_WIRE_DONATE_URL?.trim();
   const selected =
     custom.trim().length > 0 ? Math.floor(Number(custom) || 0) : amount;
 
   const pay = async () => {
     setNote("");
-    if (staticUrl) {
-      window.open(staticUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
     if (selected < 1000) {
       setNote("Хамгийн багадаа 1,000₮");
       return;
@@ -70,36 +65,32 @@ export function DonatePanel({ open, onClose }: Props) {
       <p className="board-meta">
         Дуугаа Таа-г үргэлжлүүлэхэд тусална. Wire-ээр төлнө.
       </p>
-      {!staticUrl && (
-        <>
-          <div className="donate-presets">
-            {PRESETS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                className={`donate-chip${amount === n && !custom ? " on" : ""}`}
-                disabled={busy}
-                onClick={() => {
-                  setAmount(n);
-                  setCustom("");
-                }}
-              >
-                {n.toLocaleString("mn-MN")}₮
-              </button>
-            ))}
-          </div>
-          <input
-            className="gm-input donate-custom"
-            inputMode="numeric"
-            placeholder="Өөр дүн (₮)"
-            value={custom}
+      <div className="donate-presets">
+        {PRESETS.map((n) => (
+          <button
+            key={n}
+            type="button"
+            className={`donate-chip${amount === n && !custom ? " on" : ""}`}
             disabled={busy}
-            onChange={(e) =>
-              setCustom(e.target.value.replace(/[^\d]/g, "").slice(0, 7))
-            }
-          />
-        </>
-      )}
+            onClick={() => {
+              setAmount(n);
+              setCustom("");
+            }}
+          >
+            {n.toLocaleString("mn-MN")}₮
+          </button>
+        ))}
+      </div>
+      <input
+        className="gm-input donate-custom"
+        inputMode="numeric"
+        placeholder="Өөр дүн (₮)"
+        value={custom}
+        disabled={busy}
+        onChange={(e) =>
+          setCustom(e.target.value.replace(/[^\d]/g, "").slice(0, 7))
+        }
+      />
       {note && <p className="board-note">{note}</p>}
       <button
         type="button"
@@ -109,9 +100,7 @@ export function DonatePanel({ open, onClose }: Props) {
       >
         {busy
           ? "Үүсгэж байна…"
-          : staticUrl
-            ? "Дэмжих линк нээх"
-            : `${selected.toLocaleString("mn-MN")}₮ төлөх`}
+          : `${selected.toLocaleString("mn-MN")}₮ төлөх`}
       </button>
     </div>
   );
