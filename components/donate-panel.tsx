@@ -22,8 +22,8 @@ export function DonatePanel({ open, onClose }: Props) {
 
   const pay = async () => {
     setNote("");
-    if (selected < 1000) {
-      setNote("Хамгийн багадаа 1,000₮");
+    if (selected < 1 || selected > 1_000_000) {
+      setNote("Дүн 1₮–1,000,000₮ байх ёстой");
       return;
     }
     setBusy(true);
