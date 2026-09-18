@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope, Unbounded } from "next/font/google";
 import AppClerkProvider from "@/components/app-clerk-provider";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const SITE_URL = "https://duutaay.xyz";
@@ -113,6 +114,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <AppClerkProvider>{children}</AppClerkProvider>
+        <Analytics />
       </body>
     </html>
   );
