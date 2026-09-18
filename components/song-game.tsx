@@ -19,6 +19,7 @@ import {
 import { clerkEnabled } from "@/components/app-clerk-provider";
 import ClerkIdentityBridge from "@/components/clerk-identity-bridge";
 import { GameModePanel, type GameModeId } from "@/components/game-mode-panel";
+import { DonatePanel } from "@/components/donate-panel";
 import type { PartyKind, PartyRoomInfo } from "@/lib/party";
 type Track = {
   trackId: number;
@@ -494,6 +495,7 @@ export default function SongGame() {
     [submitNote, setSubmitNote] = useState(""),
     [settingsOpen, setSettingsOpen] = useState(false),
     [commentsOpen, setCommentsOpen] = useState(false),
+    [donateOpen, setDonateOpen] = useState(false),
     [comments, setComments] = useState<CommentEntry[]>([]),
     [commentDraft, setCommentDraft] = useState(""),
     [commentsBusy, setCommentsBusy] = useState(false),
@@ -1050,6 +1052,7 @@ export default function SongGame() {
     }
     setCommentsOpen(true);
     setSettingsOpen(false);
+    setDonateOpen(false);
     setCommentNote("");
     void refreshComments();
   };
@@ -1060,13 +1063,24 @@ export default function SongGame() {
     }
     setSettingsOpen(true);
     setCommentsOpen(false);
+    setDonateOpen(false);
+  };
+  const openDonate = () => {
+    if (donateOpen) {
+      setDonateOpen(false);
+      return;
+    }
+    setDonateOpen(true);
+    setSettingsOpen(false);
+    setCommentsOpen(false);
   };
   const closeFabPanels = () => {
     setSettingsOpen(false);
     setCommentsOpen(false);
+    setDonateOpen(false);
   };
   useEffect(() => {
-    if (!settingsOpen && !commentsOpen) return;
+    if (!settingsOpen && !commentsOpen && !donateOpen) return;
     const onPointer = (e: MouseEvent | TouchEvent) => {
       const root = fabDock.current;
       if (!root) return;
@@ -1079,7 +1093,7 @@ export default function SongGame() {
       document.removeEventListener("mousedown", onPointer);
       document.removeEventListener("touchstart", onPointer);
     };
-  }, [settingsOpen, commentsOpen]);
+  }, [settingsOpen, commentsOpen, donateOpen]);
   const postComment = useCallback(async () => {
     const name = nameRef.current || playerName;
     const body = commentDraft.trim();
@@ -1575,6 +1589,16 @@ export default function SongGame() {
     (async () => {
       try {
         const params = new URLSearchParams(window.location.search);
+        if (params.get("donated") === "1") {
+          setMessage("Баярлалаа — дэмжлэг хүлээн авлаа!");
+          setKind("good");
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("donated");
+            url.searchParams.delete("donate");
+            window.history.replaceState({}, "", url.toString());
+          } catch {}
+        }
         const raw = (params.get("p") || params.get("c") || "")
           .trim()
           .toUpperCase();
@@ -2639,7 +2663,7 @@ export default function SongGame() {
           onHotSeatExit={exitHotSeat}
         />
 
-        {(settingsOpen || commentsOpen) && (
+        {(settingsOpen || commentsOpen || donateOpen) && (
           <button
             type="button"
             className="fab-backdrop"
@@ -2648,6 +2672,9 @@ export default function SongGame() {
           />
         )}
         <div className="fab-dock" ref={fabDock}>
+          {donateOpen && (
+            <DonatePanel open={donateOpen} onClose={closeFabPanels} />
+          )}
           {settingsOpen && (
             <div className="settings-pop" role="dialog" aria-label="Тохиргоо">
               <div className="settings-head">
@@ -2730,6 +2757,15 @@ export default function SongGame() {
               {commentNote && <p className="board-note">{commentNote}</p>}
             </div>
           )}
+          <button
+            type="button"
+            className={`fab donate-fab ${donateOpen ? "on" : ""}`}
+            onClick={openDonate}
+            title="Дэмжих"
+            aria-label="Дэмжих"
+          >
+            ♥
+          </button>
           <button
             type="button"
             className={`fab ${commentsOpen ? "on" : ""}`}

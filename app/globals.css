@@ -659,7 +659,8 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   box-shadow: inset 0 0 0 1px #ff2f5566, 0 10px 28px #ff2f5530;
 }
 .settings-pop,
-.comments-pop {
+.comments-pop,
+.donate-pop {
   width: min(340px, calc(100vw - 32px));
   max-height: min(62dvh, 480px);
   display: flex;
@@ -671,6 +672,37 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   border: 1px solid #2a2228;
   box-shadow: 0 20px 50px #000a;
   animation: in .2s ease both;
+}
+.donate-fab {
+  color: #ff6a84;
+}
+.donate-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.donate-chip {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #221820;
+  color: #d8c8ce;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #ffffff18;
+}
+.donate-chip.on {
+  color: #fff;
+  background: linear-gradient(180deg, #ff6a84, var(--accent));
+  box-shadow: 0 4px 14px #ff2f5540;
+}
+.donate-custom {
+  letter-spacing: 0.04em;
+  font-size: 15px;
+}
+.donate-go {
+  width: 100%;
+  height: 46px;
 }
 .settings-head {
   display: flex;
