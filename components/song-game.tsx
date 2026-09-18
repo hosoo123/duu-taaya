@@ -48,8 +48,7 @@ const instrumental =
   /\b(instrumental|karaoke|backing track|minus one|no vocals?|vocal off|off vocal|beat only)\b|зөвхөн ая|ая хувилбар/i;
 const edition =
   /\b(remaster(?:ed)?|live|remix|acoustic|instrumental|karaoke|radio edit|sped up|slowed|version|edit)\b/i;
-const featMark =
-  /\b(ft\.?|feat\.?|featuring)\b/i;
+const featMark = /\b(ft\.?|feat\.?|featuring)\b/i;
 const norm = (s: string) =>
   (s || "")
     .toLowerCase()
@@ -71,10 +70,7 @@ const canonicalTitle = (s: string) =>
         /\s*[\[(][^)\]]*(?:ft\.?|feat\.?|featuring|from\s+)[^)\]]*[\])]/gi,
         "",
       )
-      .replace(
-        /\s*(?:ft\.?|feat\.?|featuring)\s+.+$/i,
-        "",
-      )
+      .replace(/\s*(?:ft\.?|feat\.?|featuring)\s+.+$/i, "")
       .trim(),
   );
 const titleCleaner = (t: Track) => {
@@ -377,20 +373,24 @@ const cleanName = (raw: string) =>
     .replace(/[^\p{L}\p{N} _.-]/gu, "")
     .trim()
     .slice(0, 16);
-const pickSetIds = (pool: Track[], mode: Mode) => {
+// ДАРАА
+const pickSetIds = (pool: Track[], mode: Mode, genre: Genre) => {
   const fromPool = [
-    ...new Set(
-      pool.filter((t) => t.previewUrl).map((t) => t.trackId),
-    ),
+    ...new Set(pool.filter((t) => t.previewUrl).map((t) => t.trackId)),
   ];
   if (fromPool.length >= 10) return shuffle(fromPool).slice(0, 10);
-  const featured =
-    mode === "mongolian" ? mongolianFeatured : foreignFeatured;
-  const ids = [...new Set(Object.values(featured).flat())];
-  return shuffle([...fromPool, ...ids.filter((id) => !fromPool.includes(id))]).slice(
-    0,
-    10,
-  );
+
+  const featured = mode === "mongolian" ? mongolianFeatured : foreignFeatured;
+  // Тодорхой genre сонгосон бол зөвхөн тэр genre-ийн featured-ээс нөхнө
+  const ids =
+    genre === "all" || genre === "new"
+      ? [...new Set(Object.values(featured).flat())]
+      : (featured as Record<string, number[]>)[genre] || [];
+
+  return shuffle([
+    ...fromPool,
+    ...ids.filter((id) => !fromPool.includes(id)),
+  ]).slice(0, 10);
 };
 const diffScores = (e: BoardEntry) => ({
   easyScore: e.easyScore ?? (e.difficulty === "easy" ? e.score : 0),
@@ -442,7 +442,11 @@ const mergeBoards = (a: BoardEntry[], b: BoardEntry[]) => {
       ...newer,
       ...merged,
       streak: Math.max(prev.streak, e.streak),
-      score: merged.easyScore + merged.mediumScore + merged.hardScore + merged.expertScore,
+      score:
+        merged.easyScore +
+        merged.mediumScore +
+        merged.hardScore +
+        merged.expertScore,
     });
   }
   return [...map.values()]
@@ -539,11 +543,10 @@ export default function SongGame() {
     partyAppliedRef = useRef(false),
     partyJoinAttemptRef = useRef<string | null>(null),
     partyResumeRef = useRef(0),
+    partySettingsRef = useRef(""),
     limits = difficultyLimits[difficulty];
   const isPartyHost =
-    !!party &&
-    !!playerName &&
-    playerName.toLowerCase() === party.hostKey;
+    !!party && !!playerName && playerName.toLowerCase() === party.hostKey;
   const partyAuthed = clerkEnabled
     ? clerkSignedIn
     : playerName.trim().length >= 2;
@@ -584,11 +587,7 @@ export default function SongGame() {
     }
   }, []);
   const onClerkIdentity = useCallback(
-    (info: {
-      signedIn: boolean;
-      name: string | null;
-      loaded: boolean;
-    }) => {
+    (info: { signedIn: boolean; name: string | null; loaded: boolean }) => {
       setClerkSignedIn(info.signedIn);
       if (!info.loaded) return;
       if (info.signedIn && info.name) {
@@ -730,82 +729,92 @@ export default function SongGame() {
     if (typeof window === "undefined") return `/?p=${code}`;
     return `${window.location.origin}${window.location.pathname}?p=${code}`;
   };
-  const applyParty = useCallback((info: PartyRoomInfo, opts?: { soft?: boolean }) => {
-    partyCodeRef.current = info.code;
-    setParty(info);
-    const soft = !!opts?.soft;
-    const meName = (nameRef.current || "").toLowerCase();
-    const me = meName
-      ? info.players.find((p) => p.name.toLowerCase() === meName)
-      : undefined;
-    const nextMode: Mode =
-      info.mode === "foreign" ? "foreign" : "mongolian";
-    const nextDiff =
-      info.difficulty === "easy" ||
-      info.difficulty === "medium" ||
-      info.difficulty === "hard" ||
-      info.difficulty === "expert"
-        ? info.difficulty
-        : null;
-    const genreRaw = (info.genre || "all") as Genre;
-    const allowed =
-      nextMode === "mongolian"
-        ? !["anime", "jpop", "nineties", "twoThousands"].includes(genreRaw)
-        : genreRaw !== "traditional";
-    const nextGenre: Genre = allowed ? genreRaw : "all";
+  const applyParty = useCallback(
+    (info: PartyRoomInfo, opts?: { soft?: boolean }) => {
+      partyCodeRef.current = info.code;
+      setParty(info);
+      const soft = !!opts?.soft;
+      const meName = (nameRef.current || "").toLowerCase();
+      const me = meName
+        ? info.players.find((p) => p.name.toLowerCase() === meName)
+        : undefined;
+      const nextMode: Mode = info.mode === "foreign" ? "foreign" : "mongolian";
+      const nextDiff =
+        info.difficulty === "easy" ||
+        info.difficulty === "medium" ||
+        info.difficulty === "hard" ||
+        info.difficulty === "expert"
+          ? info.difficulty
+          : null;
+      const genreRaw = (info.genre || "all") as Genre;
+      const allowed =
+        nextMode === "mongolian"
+          ? !["anime", "jpop", "nineties", "twoThousands"].includes(genreRaw)
+          : genreRaw !== "traditional";
+      // ДАРАА
+      const nextGenre: Genre = allowed ? genreRaw : "all";
+      const sig = `${nextMode}|${nextGenre}|${nextDiff ?? ""}`;
 
-    // Lobby/settings + start үед бүгд sync (soft ч гэсэн)
-    setMode(nextMode);
-    if (nextDiff) setDifficulty(nextDiff);
-    setGenre(nextGenre);
-
-    // Зөвхөн гишүүнд track lock — зочин mid-game soft poll-оор lock хийхгүй
-    if (info.status !== "lobby" && info.trackIds.length >= 8 && me) {
-      setLockedTrackIds((prev) => {
-        if (
-          prev &&
-          prev.length === info.trackIds.length &&
-          prev.every((id, i) => id === info.trackIds[i])
-        )
-          return prev;
-        return info.trackIds;
-      });
-      // Анхны lock үед (soft/hard) progress сэргээнэ — soft poll дахин reset хийхгүй
-      if (!partyAppliedRef.current) {
-        partyAppliedRef.current = true;
-        const done = Math.max(0, Math.min(10, me.roundsDone || 0));
-        partyResumeRef.current = done;
-        setScore(me.score || 0);
-        setStreak(me.streak || 0);
-        setRound(done >= 10 ? 10 : Math.max(1, done + 1));
-        setPlayedRef.current = info.trackIds.slice(0, done);
+      // soft poll үед room-ын тохиргоо ҮНЭХЭЭР өөрчлөгдсөн үед л sync
+      if (!soft || partySettingsRef.current !== sig) {
+        partySettingsRef.current = sig;
+        setMode(nextMode);
+        if (nextDiff) setDifficulty(nextDiff);
+        setGenre(nextGenre);
       }
-    }
-    if (!soft) {
+
+      // Зөвхөн гишүүнд track lock — зочин mid-game soft poll-оор lock хийхгүй
+      if (info.status !== "lobby" && info.trackIds.length >= 8 && me) {
+        setLockedTrackIds((prev) => {
+          if (
+            prev &&
+            prev.length === info.trackIds.length &&
+            prev.every((id, i) => id === info.trackIds[i])
+          )
+            return prev;
+          return info.trackIds;
+        });
+        // Анхны lock үед (soft/hard) progress сэргээнэ — soft poll дахин reset хийхгүй
+        if (!partyAppliedRef.current) {
+          partyAppliedRef.current = true;
+          const done = Math.max(0, Math.min(10, me.roundsDone || 0));
+          partyResumeRef.current = done;
+          setScore(me.score || 0);
+          setStreak(me.streak || 0);
+          setRound(done >= 10 ? 10 : Math.max(1, done + 1));
+          setPlayedRef.current = info.trackIds.slice(0, done);
+        }
+      }
+      if (!soft) {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set("p", info.code);
+          url.searchParams.delete("c");
+          window.history.replaceState({}, "", url.toString());
+        } catch {}
+      }
+    },
+    [],
+  );
+  const refreshParty = useCallback(
+    async (code?: string) => {
+      const c = (code || partyCodeRef.current || "").toUpperCase();
+      if (!c) return null;
       try {
-        const url = new URL(window.location.href);
-        url.searchParams.set("p", info.code);
-        url.searchParams.delete("c");
-        window.history.replaceState({}, "", url.toString());
-      } catch {}
-    }
-  }, []);
-  const refreshParty = useCallback(async (code?: string) => {
-    const c = (code || partyCodeRef.current || "").toUpperCase();
-    if (!c) return null;
-    try {
-      const res = await fetch(`/api/party?code=${encodeURIComponent(c)}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      const info = data.room as PartyRoomInfo;
-      applyParty(info, { soft: true });
-      return info;
-    } catch {
-      return null;
-    }
-  }, [applyParty]);
+        const res = await fetch(`/api/party?code=${encodeURIComponent(c)}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const info = data.room as PartyRoomInfo;
+        applyParty(info, { soft: true });
+        return info;
+      } catch {
+        return null;
+      }
+    },
+    [applyParty],
+  );
   const submitPartyScore = useCallback(
     async (points: number, st: number, roundsDone: number) => {
       const code = partyCodeRef.current;
@@ -935,8 +944,7 @@ export default function SongGame() {
         } else if (data.error === "full") setPartyNote("Room дүүрсэн");
         else if (data.error === "started")
           setPartyNote("Тоглолт эхэлсэн — зөвхөн гишүүд орно");
-        else if (data.error === "expired")
-          setPartyNote("Room хугацаа дууссан");
+        else if (data.error === "expired") setPartyNote("Room хугацаа дууссан");
         else setPartyNote("Room олдсонгүй");
       } catch {
         setPartyNote("Орж чадсангүй");
@@ -954,7 +962,7 @@ export default function SongGame() {
       setPartyNote("Дуунууд ачаалагдаж дуусахыг хүлээгээд дахин Эхлэх дар");
       return;
     }
-    const ids = pickSetIds(tracks, mode);
+    const ids = pickSetIds(tracks, mode, genre);
     if (ids.length !== 10) {
       setPartyNote("Дууны сан хүрэлцэхгүй байна");
       return;
@@ -1033,8 +1041,7 @@ export default function SongGame() {
     clearRevealUi();
     // Party дууссан / 10/10 — lock авч solo үргэлжлүүлнэ (load effect дахин ажиллана)
     const done =
-      party?.status === "finished" ||
-      (!!partyCodeRef.current && round >= 10);
+      party?.status === "finished" || (!!partyCodeRef.current && round >= 10);
     if (done) {
       leaveParty();
       setScore(0);
@@ -1553,7 +1560,7 @@ export default function SongGame() {
       if (featuredIds.length)
         calls.push(
           fetch(
-            `https://itunes.apple.com/lookup?id=${featuredIds.join(",")}&entity=song&country=${country}`,
+            `https://itunes.apple.com/lookup?id=${featuredIds.join(",")}&entity=song&limit=200&country=${country}`,
           )
             .then((r) => r.json())
             .catch(() => ({ results: [] })),
@@ -1610,14 +1617,7 @@ export default function SongGame() {
     } finally {
       setLoading(false);
     }
-  }, [
-    bootReady,
-    lockedTrackIds,
-    loadByTrackIds,
-    mode,
-    genre,
-    takeNext,
-  ]);
+  }, [bootReady, lockedTrackIds, loadByTrackIds, mode, genre, takeNext]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -2133,9 +2133,7 @@ export default function SongGame() {
             ))}
           </div>
         </div>
-        {clerkEnabled && (
-          <ClerkIdentityBridge onIdentity={onClerkIdentity} />
-        )}
+        {clerkEnabled && <ClerkIdentityBridge onIdentity={onClerkIdentity} />}
         {clerkEnabled ? (
           <>
             <Show when="signed-in">
@@ -2543,7 +2541,9 @@ export default function SongGame() {
             <div className="board-card name-card">
               <small>ТОГЛОГЧ</small>
               <strong>
-                {clerkEnabled ? "Нэвтэр эсвэл зочиноор тогло" : "Leaderboard нэр"}
+                {clerkEnabled
+                  ? "Нэвтэр эсвэл зочиноор тогло"
+                  : "Leaderboard нэр"}
               </strong>
               {clerkEnabled && (
                 <div className="auth-row">
