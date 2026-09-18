@@ -51,16 +51,24 @@ export async function POST(req: NextRequest) {
   const operators = operatorsForKey(apiKey);
   const wire = new Wire(apiKey);
   const donateId = crypto.randomUUID();
+  // Wire dashboard: «Утга» = description (docs: гүйлгээний утга)
+  const description = `Дуугаа Таа · дэмжлэг · ${amountMnt.toLocaleString("mn-MN")}₮`;
 
   try {
-    const pi = await wire.paymentIntents.create({
-      amount: amountMnt,
-      currency: "MNT",
-      allowed_operators: operators,
-      metadata: {
-        purpose: "donation",
-        app: "duu-taaya",
-        amount_mnt: String(amountMnt),
+    // TS SDK type-д description байхгүй ч API/docs дэмждэг
+    const pi = await wire.request<{ id: string }>("POST", "/v1/payment_intents", {
+      body: {
+        amount: amountMnt,
+        currency: "MNT",
+        description,
+        allowed_operators: operators,
+        metadata: {
+          purpose: "donation",
+          product: "Дуугаа Таа дэмжлэг",
+          product_and_service_type: "Дэмжлэг / Donation",
+          app: "duu-taaya",
+          amount_mnt: String(amountMnt),
+        },
       },
       idempotencyKey: `donate-pi-${donateId}`,
     });
