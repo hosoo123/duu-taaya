@@ -49,14 +49,12 @@ export async function POST(req: NextRequest) {
   }
 
   const operators = operatorsForKey(apiKey);
-  // Wire: 50000 minor = 500.00 MNT
-  const amountMinor = amountMnt * 100;
   const wire = new Wire(apiKey);
   const donateId = crypto.randomUUID();
 
   try {
     const pi = await wire.paymentIntents.create({
-      amount: amountMinor,
+      amount: amountMnt,
       currency: "MNT",
       allowed_operators: operators,
       metadata: {
