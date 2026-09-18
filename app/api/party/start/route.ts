@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
   const code = String(data?.code || "")
     .trim()
     .toUpperCase();
-  const hostKey = cleanPartyName(String(data?.hostKey || data?.name || "")).toLowerCase();
+  const hostKey = cleanPartyName(
+    String(data?.hostKey || data?.name || ""),
+  ).toLowerCase();
   const trackIds = Array.isArray(data?.trackIds)
     ? [
         ...new Set(
@@ -46,10 +48,16 @@ export async function POST(req: NextRequest) {
   const difficulty = (DIFFS as readonly string[]).includes(difficultyRaw)
     ? difficultyRaw
     : null;
+  // ДАРАА
   const genreRaw = String(data?.genre || "").slice(0, 20);
-  const genre = (GENRES as readonly string[]).includes(genreRaw)
-    ? genreRaw
-    : null;
+  const mongolianOnlyExclusive = ["anime", "jpop", "nineties", "twoThousands"];
+  const genre = !(GENRES as readonly string[]).includes(genreRaw)
+    ? null
+    : mode === "mongolian" && mongolianOnlyExclusive.includes(genreRaw)
+      ? "all"
+      : mode === "foreign" && genreRaw === "traditional"
+        ? "all"
+        : genreRaw;
   if (!code || !hostKey)
     return NextResponse.json({ error: "code" }, { status: 400 });
   if (trackIds.length !== 10)
