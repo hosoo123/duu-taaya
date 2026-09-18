@@ -16,6 +16,7 @@ import {
   type Genre,
   type Mode,
 } from "@/data/catalog";
+import { mongolianFeaturedAdditions } from "@/data/curated-additions";
 import { clerkEnabled } from "@/components/app-clerk-provider";
 import ClerkIdentityBridge from "@/components/clerk-identity-bridge";
 import { GameModePanel, type GameModeId } from "@/components/game-mode-panel";
@@ -373,6 +374,18 @@ const cleanName = (raw: string) =>
     .replace(/[^\p{L}\p{N} _.-]/gu, "")
     .trim()
     .slice(0, 16);
+const featuredIdsFor = (mode: Mode, genre: Genre) => {
+  const featured = mode === "mongolian" ? mongolianFeatured : foreignFeatured;
+  const base =
+    genre === "all" || genre === "new"
+      ? Object.values(featured).flat()
+      : (featured as Record<string, number[]>)[genre] || [];
+  const additions =
+    mode === "mongolian" && genre === "hiphop"
+      ? mongolianFeaturedAdditions.hiphop
+      : [];
+  return [...new Set([...base, ...additions])];
+};
 // ДАРАА
 const pickSetIds = (pool: Track[], mode: Mode, genre: Genre) => {
   const fromPool = [
@@ -380,12 +393,8 @@ const pickSetIds = (pool: Track[], mode: Mode, genre: Genre) => {
   ];
   if (fromPool.length >= 10) return shuffle(fromPool).slice(0, 10);
 
-  const featured = mode === "mongolian" ? mongolianFeatured : foreignFeatured;
   // Тодорхой genre сонгосон бол зөвхөн тэр genre-ийн featured-ээс нөхнө
-  const ids =
-    genre === "all" || genre === "new"
-      ? [...new Set(Object.values(featured).flat())]
-      : (featured as Record<string, number[]>)[genre] || [];
+  const ids = featuredIdsFor(mode, genre);
 
   return shuffle([
     ...fromPool,
@@ -1530,33 +1539,31 @@ export default function SongGame() {
     setMessage("");
     setKind("");
     setLastSkipped(null);
-    const pools = mode === "mongolian" ? mongolianPools : foreignPools,
-      featured = mode === "mongolian" ? mongolianFeatured : foreignFeatured;
-    const ids =
-        genre === "all" || genre === "new"
-          ? [
-              ...new Set(
-                Object.entries(pools)
-                  .filter(([k]) => !eraOnly.has(k as Genre))
-                  .flatMap(([, v]) => v),
-              ),
-            ]
-          : (pools as Record<string, number[]>)[genre] || [],
-      featuredIds =
-        genre === "all" || genre === "new"
-          ? [...new Set(Object.values(featured).flat())]
-          : (featured as Record<string, number[]>)[genre] || [],
+    const pools = mode === "mongolian" ? mongolianPools : foreignPools;
+    const curatedGenre = genre !== "all" && genre !== "new";
+    const ids = !curatedGenre
+        ? [
+            ...new Set(
+              Object.entries(pools)
+                .filter(([k]) => !eraOnly.has(k as Genre))
+                .flatMap(([, v]) => v),
+            ),
+          ]
+        : (pools as Record<string, number[]>)[genre] || [],
+      featuredIds = featuredIdsFor(mode, genre),
       artists = new Set(ids),
       songs = new Set(featuredIds),
       country = mode === "foreign" ? "us" : "au";
     try {
-      const calls = ids.map((id) =>
-        fetch(
-          `https://itunes.apple.com/lookup?id=${id}&entity=song&limit=100&country=${country}`,
-        )
-          .then((r) => r.json())
-          .catch(() => ({ results: [] })),
-      );
+      const calls = curatedGenre
+        ? []
+        : ids.map((id) =>
+            fetch(
+              `https://itunes.apple.com/lookup?id=${id}&entity=song&limit=100&country=${country}`,
+            )
+              .then((r) => r.json())
+              .catch(() => ({ results: [] })),
+          );
       if (featuredIds.length)
         calls.push(
           fetch(
