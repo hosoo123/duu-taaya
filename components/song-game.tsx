@@ -496,6 +496,9 @@ export default function SongGame() {
     [settingsOpen, setSettingsOpen] = useState(false),
     [commentsOpen, setCommentsOpen] = useState(false),
     [donateOpen, setDonateOpen] = useState(false),
+    [donateBanner, setDonateBanner] = useState<null | "success" | "cancelled">(
+      null,
+    ),
     [comments, setComments] = useState<CommentEntry[]>([]),
     [commentDraft, setCommentDraft] = useState(""),
     [commentsBusy, setCommentsBusy] = useState(false),
@@ -1009,6 +1012,37 @@ export default function SongGame() {
       window.history.replaceState({}, "", url.toString());
     } catch {}
   }, []);
+  const clearRevealUi = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    audio.current?.pause();
+    paused.current = false;
+    remaining.current = 0;
+    setRevealed(false);
+    setRevealInfo(null);
+    setLastSkipped(null);
+    setFireworks([]);
+    setSuggestionsOpen(false);
+    setGuess("");
+    setSelected(null);
+    setMessage("");
+    setKind("");
+  }, []);
+  const closeGameMode = useCallback(() => {
+    setGameModeOpen(false);
+    clearRevealUi();
+    // Party дууссан / 10/10 — lock авч solo үргэлжлүүлнэ (load effect дахин ажиллана)
+    const done =
+      party?.status === "finished" ||
+      (!!partyCodeRef.current && round >= 10);
+    if (done) {
+      leaveParty();
+      setScore(0);
+      setStreak(0);
+      setRound(1);
+      setPlayedRef.current = [];
+    }
+  }, [clearRevealUi, leaveParty, party?.status, round]);
   const setupHotSeat = useCallback(
     (names: string[]) => {
       if (clerkEnabled && !clerkSignedIn) {
@@ -1591,8 +1625,7 @@ export default function SongGame() {
         const params = new URLSearchParams(window.location.search);
         const payment = params.get("payment");
         if (payment === "success" || params.get("donated") === "1") {
-          setMessage("Төлбөр амжилттай. Дуугаа Таа-г дэмжсэнд баярлалаа!");
-          setKind("good");
+          setDonateBanner("success");
           try {
             const url = new URL(window.location.href);
             url.searchParams.delete("donated");
@@ -1600,9 +1633,11 @@ export default function SongGame() {
             url.searchParams.delete("payment");
             window.history.replaceState({}, "", url.toString());
           } catch {}
-        } else if (payment === "cancelled" || params.get("donate") === "cancel") {
-          setMessage("Төлбөр цуцлагдлаа. Хүсвэл дахин оролдоорой.");
-          setKind("bad");
+        } else if (
+          payment === "cancelled" ||
+          params.get("donate") === "cancel"
+        ) {
+          setDonateBanner("cancelled");
           try {
             const url = new URL(window.location.href);
             url.searchParams.delete("donate");
@@ -1654,6 +1689,11 @@ export default function SongGame() {
       cancelled = true;
     };
   }, [applyParty]);
+  useEffect(() => {
+    if (!donateBanner) return;
+    const id = window.setTimeout(() => setDonateBanner(null), 8000);
+    return () => window.clearTimeout(id);
+  }, [donateBanner]);
   useEffect(() => {
     if (!bootReady || !partyAuthed) return;
     const name = nameRef.current || playerName;
@@ -1865,6 +1905,7 @@ export default function SongGame() {
         lastSetScoreRef.current = scoreRef.current;
         lastSetStreakRef.current = streakRef.current;
         if (inParty) {
+          clearRevealUi();
           setGameModeOpen(true);
           setPartyNote("10/10 дууссан — оноогоо харна уу");
           setBoardOpen(false);
@@ -2049,6 +2090,26 @@ export default function SongGame() {
   };
   return (
     <main className="shell">
+      {donateBanner && (
+        <div
+          className={`donate-banner ${donateBanner === "success" ? "good" : "bad"}`}
+          role="status"
+        >
+          <p>
+            {donateBanner === "success"
+              ? "Төлбөр амжилттай. Дуугаа Таа-г дэмжсэнд баярлалаа!"
+              : "Төлбөр цуцлагдлаа. Хүсвэл дахин оролдоорой."}
+          </p>
+          <button
+            type="button"
+            className="donate-banner-x"
+            aria-label="Хаах"
+            onClick={() => setDonateBanner(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <aside className="rail">
         <div className="brand">
           <span className="mark">♫</span>
@@ -2647,7 +2708,7 @@ export default function SongGame() {
 
         <GameModePanel
           open={gameModeOpen}
-          onClose={() => setGameModeOpen(false)}
+          onClose={closeGameMode}
           playerName={playerName}
           signedIn={clerkSignedIn}
           clerkOn={clerkEnabled}
@@ -2665,7 +2726,10 @@ export default function SongGame() {
           onStartParty={() => void startParty()}
           onCopyInvite={() => void copyInvite()}
           onRefresh={() => void refreshParty()}
-          onLeave={leaveParty}
+          onLeave={() => {
+            clearRevealUi();
+            leaveParty();
+          }}
           onLobbySettings={(next) => void updateLobbySettings(next)}
           hotSeatNames={hotSeatNames}
           hotSeatTurn={hotSeatTurn}

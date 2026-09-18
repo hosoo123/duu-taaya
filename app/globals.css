@@ -1206,6 +1206,62 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .message.good { color: var(--good); }
 .message.bad { color: var(--accent-2); }
 
+.donate-banner {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #3a2e36;
+  background: #160e14f2;
+  box-shadow: 0 18px 40px #00000066;
+  transform: translateX(-50%);
+  animation: donate-banner-in 0.28s ease-out;
+}
+.donate-banner.good {
+  border-color: color-mix(in srgb, var(--good) 55%, #3a2e36);
+}
+.donate-banner.bad {
+  border-color: color-mix(in srgb, var(--accent-2) 55%, #3a2e36);
+}
+.donate-banner p {
+  margin: 0;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.35;
+  color: #f4ebe6;
+}
+.donate-banner.good p { color: var(--good); }
+.donate-banner.bad p { color: var(--accent-2); }
+.donate-banner-x {
+  flex: none;
+  margin: -4px -6px 0 0;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: #c9b4bc;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.donate-banner-x:hover { color: #fff; }
+@keyframes donate-banner-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 .reveal-overlay {
   position: fixed;
   inset: 0;
