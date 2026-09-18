@@ -256,6 +256,7 @@ export function GameModePanel({
 
             {room.status === "lobby" && (
               <div className="gm-lobby-settings">
+                <p className="gm-lobby-title">Дууны тохиргоо</p>
                 <div className="gm-setting-block">
                   <span className="gm-setting-label">Горим</span>
                   <div className="gm-chip-row">
@@ -295,7 +296,7 @@ export function GameModePanel({
                 </div>
                 <div className="gm-setting-block">
                   <span className="gm-setting-label">Жанр</span>
-                  <div className="gm-chip-row gm-chip-wrap">
+                  <div className="gm-chip-row">
                     {genreOptions.map((g) => (
                       <button
                         key={g}
@@ -310,7 +311,7 @@ export function GameModePanel({
                   </div>
                 </div>
                 {!isHost && (
-                  <p className="board-meta">Host тохиргоо сонгоно</p>
+                  <p className="board-meta">Зөвхөн host солино</p>
                 )}
               </div>
             )}

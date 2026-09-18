@@ -148,11 +148,19 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   box-shadow: inset 0 0 0 1px #ff2f5544, 0 8px 20px #ff2f5520;
 }
 .game-mode-card {
-  width: min(400px, 100%);
-  gap: 14px;
+  width: min(440px, 100%);
+  max-height: min(92dvh, 720px);
+  gap: 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .game-mode-card .board-meta {
   word-break: break-word;
+}
+.game-mode-card .gm-list {
+  min-height: 64px;
+  max-height: 140px;
+  flex: 0 1 auto;
 }
 .gm-grid {
   display: grid;
@@ -272,58 +280,60 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .gm-lobby-settings {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 4px 0 8px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: #100c12;
-  box-shadow: inset 0 0 0 1px #ffffff10;
+  gap: 12px;
+  margin: 2px 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #1c1218, #100c12);
+  box-shadow: inset 0 0 0 1px #ff2f5530;
+}
+.gm-lobby-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--ink);
 }
 .gm-setting-block {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 .gm-setting-label {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--faint);
+  color: var(--accent-2);
 }
 .gm-chip-row {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-}
-.gm-chip-row::-webkit-scrollbar {
-  display: none;
-}
-.gm-chip-wrap {
   flex-wrap: wrap;
-  overflow: visible;
+  gap: 6px;
 }
 .gm-chip {
   flex: 0 0 auto;
-  height: 30px;
+  min-height: 34px;
   padding: 0 12px;
   border-radius: 999px;
-  background: #1a141c;
-  color: var(--mute);
+  background: #221820;
+  color: #d8c8ce;
   font-size: 12px;
   font-weight: 700;
-  box-shadow: inset 0 0 0 1px #ffffff10;
+  box-shadow: inset 0 0 0 1px #ffffff18;
 }
 .gm-chip.on {
-  color: var(--ink);
+  color: #fff;
   background: linear-gradient(180deg, #ff6a84, var(--accent));
-  box-shadow: none;
+  box-shadow: 0 4px 14px #ff2f5540;
 }
 .gm-chip:disabled:not(.on) {
-  opacity: 0.55;
+  opacity: 0.65;
+}
+.gm-chip:not(:disabled):hover {
+  color: #fff;
+  box-shadow: inset 0 0 0 1px #ff2f5555;
 }
 .gm-input {
   width: 100%;
@@ -358,6 +368,10 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 }
 .gm-actions {
   flex-wrap: wrap;
+  position: sticky;
+  bottom: -2px;
+  padding-top: 4px;
+  background: linear-gradient(180deg, transparent, #0b080ef8 28%);
 }
 .gm-join-btn {
   flex: 1;
