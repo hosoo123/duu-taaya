@@ -48,10 +48,14 @@ export function DonatePanel({ open, onClose }: Props) {
 
   return (
     <div className="donate-pop" role="dialog" aria-label="Дэмжих">
-      <div className="settings-head">
-        <div>
-          <small>DONATE</small>
+      <div className="donate-hero">
+        <span className="donate-hero-mark" aria-hidden>
+          ♥
+        </span>
+        <div className="donate-hero-copy">
+          <small>SUPPORT</small>
           <strong>Дэмжих</strong>
+          <p>Дуугаа Таа үнэгүй. Дуртай бол жижиг дэмжлэг үзүүлээрэй.</p>
         </div>
         <button
           type="button"
@@ -62,9 +66,6 @@ export function DonatePanel({ open, onClose }: Props) {
           ×
         </button>
       </div>
-      <p className="board-meta">
-        Дуугаа Таа-г үргэлжлүүлэхэд тусална. Wire-ээр төлнө.
-      </p>
       <div className="donate-presets">
         {PRESETS.map((n) => (
           <button
@@ -100,8 +101,9 @@ export function DonatePanel({ open, onClose }: Props) {
       >
         {busy
           ? "Үүсгэж байна…"
-          : `${selected.toLocaleString("mn-MN")}₮ төлөх`}
+          : `♥  ${selected.toLocaleString("mn-MN")}₮ дэмжих`}
       </button>
+      <p className="donate-secure">Wire · QPay · Аюулгүй төлбөр</p>
     </div>
   );
 }

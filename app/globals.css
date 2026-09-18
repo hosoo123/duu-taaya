@@ -710,8 +710,178 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   box-shadow: 0 20px 50px #000a;
   animation: in .2s ease both;
 }
+.donate-pop {
+  width: min(360px, calc(100vw - 32px));
+  gap: 14px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #ff2f5540;
+  box-shadow:
+    0 0 0 1px #ff2f5520,
+    0 22px 55px #000b,
+    0 0 40px #ff2f5525;
+}
+.donate-hero {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 16px 14px 14px;
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 0%, #ff2f5540, transparent 55%),
+    linear-gradient(180deg, #2a1420, #141018);
+  border-bottom: 1px solid #ff2f5530;
+}
+.donate-hero-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  color: #fff;
+  background: linear-gradient(145deg, #ff5d78, #c9183c);
+  box-shadow: 0 10px 24px #ff2f5555;
+  animation: donate-heart-beat 1.5s ease-in-out infinite;
+}
+.donate-hero-copy {
+  min-width: 0;
+  padding-top: 2px;
+}
+.donate-hero-copy small {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #ff8fa3;
+}
+.donate-hero-copy strong {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.donate-hero-copy p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #c9b4bc;
+}
+.donate-pop .donate-presets,
+.donate-pop .donate-custom,
+.donate-pop .board-note,
+.donate-pop .donate-go,
+.donate-pop .donate-secure {
+  margin-left: 14px;
+  margin-right: 14px;
+}
+.donate-pop .donate-secure {
+  margin-bottom: 14px;
+  margin-top: -4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--faint);
+  letter-spacing: 0.04em;
+}
 .donate-fab {
-  color: #ff6a84;
+  position: relative;
+  width: 50px;
+  min-width: 50px;
+  height: 50px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  border-radius: 16px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, #ff5d78, #d4143c 55%, #a01030);
+  box-shadow:
+    inset 0 1px 0 #ffffff33,
+    0 0 0 0 #ff2f5566,
+    0 12px 30px #ff2f5548;
+  animation: donate-fab-pulse 2.2s ease-in-out infinite;
+  overflow: hidden;
+  transition:
+    width 0.22s ease,
+    min-width 0.22s ease,
+    padding 0.22s ease,
+    gap 0.22s ease,
+    border-radius 0.22s ease,
+    filter 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.22s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .donate-fab:hover,
+  .donate-fab:focus-visible {
+    width: auto;
+    min-width: 50px;
+    padding: 0 16px 0 14px;
+    gap: 8px;
+    justify-content: flex-start;
+    border-radius: 999px;
+    overflow: visible;
+    filter: brightness(1.06);
+    transform: translateY(-2px);
+  }
+  .donate-fab:hover .donate-fab-text,
+  .donate-fab:focus-visible .donate-fab-text {
+    max-width: 80px;
+    opacity: 1;
+    margin-left: 0;
+  }
+}
+.donate-fab.on {
+  width: auto;
+  min-width: 50px;
+  padding: 0 16px 0 14px;
+  gap: 8px;
+  justify-content: flex-start;
+  border-radius: 999px;
+  overflow: visible;
+  background: linear-gradient(135deg, #ff7a90, #e01e48);
+  box-shadow:
+    inset 0 1px 0 #ffffff44,
+    0 0 0 3px #ff2f5544,
+    0 14px 32px #ff2f5560;
+  animation: none;
+}
+.donate-fab.on .donate-fab-text {
+  max-width: 80px;
+  opacity: 1;
+}
+.donate-fab-pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 1.5px solid #ff2f5588;
+  pointer-events: none;
+  animation: donate-ring 2.2s ease-out infinite;
+}
+.donate-fab.on .donate-fab-pulse { display: none; }
+.donate-fab-icon {
+  flex: none;
+  font-size: 18px;
+  line-height: 1;
+  animation: donate-heart-beat 1.4s ease-in-out infinite;
+}
+.donate-fab.on .donate-fab-icon { animation: none; }
+.donate-fab-text {
+  position: relative;
+  z-index: 1;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 0.22s ease, opacity 0.18s ease;
 }
 .donate-presets {
   display: flex;
@@ -719,7 +889,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   gap: 6px;
 }
 .donate-chip {
-  min-height: 34px;
+  min-height: 36px;
   padding: 0 12px;
   border-radius: 999px;
   background: #221820;
@@ -727,6 +897,11 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   font-size: 12px;
   font-weight: 700;
   box-shadow: inset 0 0 0 1px #ffffff18;
+  transition: .15s ease;
+}
+.donate-chip:hover:not(:disabled) {
+  color: #fff;
+  box-shadow: inset 0 0 0 1px #ff2f5555;
 }
 .donate-chip.on {
   color: #fff;
@@ -738,8 +913,44 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   font-size: 15px;
 }
 .donate-go {
-  width: 100%;
-  height: 46px;
+  width: auto;
+  align-self: stretch;
+  height: 50px;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 10px 28px #ff2f5548;
+}
+@keyframes donate-fab-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 #ffffff33,
+      0 0 0 0 #ff2f5500,
+      0 12px 30px #ff2f5548;
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 #ffffff33,
+      0 0 0 8px #ff2f5520,
+      0 14px 34px #ff2f5566;
+  }
+}
+@keyframes donate-ring {
+  0% { opacity: 0.85; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.22); }
+}
+@keyframes donate-heart-beat {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.12); }
+  50% { transform: scale(1); }
+  65% { transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .donate-fab,
+  .donate-fab-pulse,
+  .donate-fab-icon,
+  .donate-hero-mark {
+    animation: none;
+  }
 }
 .settings-head {
   display: flex;
@@ -1584,8 +1795,21 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     bottom: max(12px, env(safe-area-inset-bottom));
   }
   .fab { width: 46px; height: 46px; border-radius: 15px; }
+  .donate-fab {
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+    padding: 0;
+    border-radius: 15px;
+  }
+  .donate-fab.on {
+    width: auto;
+    padding: 0 14px 0 12px;
+    font-size: 13px;
+  }
   .settings-pop,
   .comments-pop { width: min(320px, calc(100vw - 24px)); }
+  .donate-pop { width: min(340px, calc(100vw - 24px)); }
   .stage {
     padding: 14px 14px max(28px, env(safe-area-inset-bottom));
     justify-content: flex-start;

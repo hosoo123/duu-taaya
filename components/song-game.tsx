@@ -2857,7 +2857,11 @@ export default function SongGame() {
             title="Дэмжих"
             aria-label="Дэмжих"
           >
-            ♥
+            <span className="donate-fab-pulse" aria-hidden />
+            <span className="donate-fab-icon" aria-hidden>
+              ♥
+            </span>
+            <span className="donate-fab-text">Дэмжих</span>
           </button>
           <button
             type="button"
