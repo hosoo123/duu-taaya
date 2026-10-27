@@ -2272,7 +2272,6 @@ export default function SongGame() {
           </div>
         </header>
 
-        <div className="game-core">
         <nav className="genres">
           {visibleGenres(mode).map((g) => (
             <button
@@ -2290,6 +2289,7 @@ export default function SongGame() {
           ))}
         </nav>
 
+        <div className="game-core">
         <h1 className="logo">Дуугаа Таа</h1>
 
         <div className={`wave ${playing ? "playing" : ""}`} ref={wave}>

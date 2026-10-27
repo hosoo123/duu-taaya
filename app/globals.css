@@ -20,7 +20,8 @@ html { background: var(--bg); }
 body {
   margin: 0;
   min-height: 100dvh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   color: var(--ink);
   font: 15px/1.45 var(--font-body);
   background:
@@ -33,7 +34,7 @@ button { cursor: pointer; border: 0; background: none; color: inherit; }
 button:disabled { opacity: .4; cursor: not-allowed; }
 
 .shell {
-  height: 100dvh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: 112px 1fr;
   animation: in .5s cubic-bezier(.2,.8,.2,1) both;
@@ -1138,18 +1139,17 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   align-items: center;
   justify-content: center;
   padding: 28px 24px 36px;
+  min-height: 100dvh;
   min-width: 0;
   overflow: visible;
 }
 
 .game-core {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
-}
-.stage:has(.prev-skip) .game-core {
-  margin-top: min(144px, 16vh);
 }
 
 .hud {
@@ -1703,8 +1703,12 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .listen-row.compact .listen svg { width: 15px; height: 15px; }
 
 .prev-skip {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: 50%;
+  transform: translateX(-50%);
   width: min(420px, 94%);
-  margin-top: 14px;
+  margin-top: 0;
   padding: 10px 14px;
   border-radius: 14px;
   border: 1px solid #2a2228;
@@ -1739,7 +1743,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   50% { box-shadow: 0 10px 40px #ff2f5566; }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   body {
     overflow-y: auto;
     overflow-x: hidden;
@@ -1824,7 +1828,11 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     padding: 14px 14px max(28px, env(safe-area-inset-bottom));
     justify-content: flex-start;
   }
-  .stage:has(.prev-skip) .game-core { margin-top: 0; }
+  .prev-skip {
+    position: static;
+    transform: none;
+    margin-top: 14px;
+  }
   .hud {
     position: static;
     flex-direction: column;
@@ -1896,6 +1904,18 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   }
   .reveal img { width: 108px; height: 108px; }
   .reveal strong { font-size: 18px; }
+}
+
+@media (min-width: 901px) and (max-height: 700px) {
+  .stage {
+    justify-content: flex-start;
+    padding-top: 112px;
+  }
+  .prev-skip {
+    position: static;
+    transform: none;
+    margin-top: 14px;
+  }
 }
 
 @media (max-width: 380px) {
