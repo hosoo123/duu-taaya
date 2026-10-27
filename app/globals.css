@@ -1142,6 +1142,16 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   overflow: visible;
 }
 
+.game-core {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+.stage:has(.prev-skip) .game-core {
+  transform: translateY(min(72px, 8vh));
+}
+
 .hud {
   position: absolute;
   top: 22px;
@@ -1693,12 +1703,8 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 .listen-row.compact .listen svg { width: 15px; height: 15px; }
 
 .prev-skip {
-  position: absolute;
-  top: calc(50% + 235px);
-  left: 50%;
-  transform: translateX(-50%);
   width: min(420px, 94%);
-  margin-top: 0;
+  margin-top: 14px;
   padding: 10px 14px;
   border-radius: 14px;
   border: 1px solid #2a2228;
@@ -1818,11 +1824,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     padding: 14px 14px max(28px, env(safe-area-inset-bottom));
     justify-content: flex-start;
   }
-  .prev-skip {
-    position: static;
-    transform: none;
-    margin-top: 14px;
-  }
+  .stage:has(.prev-skip) .game-core { transform: none; }
   .hud {
     position: static;
     flex-direction: column;

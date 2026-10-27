@@ -2272,6 +2272,7 @@ export default function SongGame() {
           </div>
         </header>
 
+        <div className="game-core">
         <nav className="genres">
           {visibleGenres(mode).map((g) => (
             <button
@@ -2452,6 +2453,7 @@ export default function SongGame() {
             </div>
           </div>
         )}
+        </div>
 
         {revealed && revealInfo && (
           <div className="reveal-overlay" role="dialog" aria-modal="true">
