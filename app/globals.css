@@ -1149,7 +1149,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   width: 100%;
 }
 .stage:has(.prev-skip) .game-core {
-  transform: translateY(min(72px, 8vh));
+  margin-top: min(144px, 16vh);
 }
 
 .hud {
@@ -1824,7 +1824,7 @@ button:disabled { opacity: .4; cursor: not-allowed; }
     padding: 14px 14px max(28px, env(safe-area-inset-bottom));
     justify-content: flex-start;
   }
-  .stage:has(.prev-skip) .game-core { transform: none; }
+  .stage:has(.prev-skip) .game-core { margin-top: 0; }
   .hud {
     position: static;
     flex-direction: column;
