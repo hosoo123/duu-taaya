@@ -14,7 +14,8 @@ export default clerkOn
 
 export const config = {
   matcher: [
-   "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // sitemap.xml / robots.txt-г Clerk-ээр дамжуулахгүй — Googlebot redirect авахгүй байх ёстой
+    "/((?!_next|sitemap\\.xml|robots\\.txt|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|xml|txt)).*)",
     "/(api|trpc)(.*)",
     "/__clerk/:path*",
   ],
