@@ -1923,3 +1923,34 @@ button:disabled { opacity: .4; cursor: not-allowed; }
   .stats span:not(:empty) { font-size: 10px; }
   .logo { font-size: 26px; }
 }
+
+/* Privacy / legal pages */
+.legal-page {
+  min-height: 100dvh;
+  padding: 48px 16px;
+  background:
+    radial-gradient(ellipse 70% 45% at 50% -5%, #4a1528 0%, transparent 55%),
+    #050308;
+  color: #f3eef2;
+}
+.legal-card {
+  max-width: 720px;
+  margin: 0 auto;
+  font-family: var(--font-body), system-ui, sans-serif;
+  line-height: 1.7;
+}
+.legal-card h1 {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  margin: 24px 0 4px;
+}
+.legal-card h2 {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.15rem;
+  margin: 32px 0 8px;
+}
+.legal-card ul { padding-left: 1.2rem; list-style: disc; }
+.legal-card li { margin: 4px 0; }
+.legal-card a { color: #ff7aa8; text-decoration: underline; }
+.legal-meta { opacity: 0.6; font-size: 0.9rem; }
+.legal-back { text-decoration: none !important; opacity: 0.8; }
